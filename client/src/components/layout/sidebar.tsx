@@ -9,12 +9,14 @@ import {
   Settings,
   Bot,
   Shield,
-  AlertTriangle
+  AlertTriangle,
+  BarChart3
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Data Upload", href: "/data-upload", icon: Upload },
   { name: "PIP Management", href: "/pips", icon: ClipboardList },
   { name: "Coaching System", href: "/coaching", icon: MessageSquare },

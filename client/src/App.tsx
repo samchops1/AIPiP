@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "@/pages/dashboard";
+import Analytics from "@/pages/analytics";
 import DataUpload from "@/pages/data-upload";
 import PipManagement from "@/pages/pip-management";
 import CoachingSystem from "@/pages/coaching-system";
@@ -22,6 +23,7 @@ function Router() {
         <Header />
         <Switch>
           <Route path="/" component={Dashboard} />
+          <Route path="/analytics" component={Analytics} />
           <Route path="/data-upload" component={DataUpload} />
           <Route path="/pips" component={PipManagement} />
           <Route path="/coaching" component={CoachingSystem} />

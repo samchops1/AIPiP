@@ -302,10 +302,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "employeeId and score are required" });
       }
       
-      const feedback = generateCoachingFeedback(score);
+      const employee = await storage.getEmployee(employeeId);
+      const feedback = generateCoachingFeedback(score, employee?.name, employee?.role);
       
       // Generate PDF for coaching session
-      const employee = await storage.getEmployee(employeeId);
       if (employee) {
         const pdfPath = await generateCoachingPDF(
           employee.name,
@@ -786,7 +786,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (employeeMetrics.length >= settings.consecutiveLowPeriods) {
           const allLowPerformance = employeeMetrics.every(m => 
-            m.score < settings.minScoreThreshold && 
+            m.score < settings.minScoreThreshold || 
             m.utilization < settings.minUtilizationThreshold
           );
 
@@ -1090,15 +1090,278 @@ async function evaluatePIPCandidates() {
   return { results, processed: employees.length };
 }
 
-function generateCoachingFeedback(score: number): string {
+function generateCoachingFeedback(score: number, employeeName?: string, role?: string): string {
+  const currentDate = new Date().toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+  
+  const name = employeeName || '[Employee Name]';
+  const position = role || '[Position]';
+  
   if (score < 60) {
-    return "Focus on fundamental skills improvement. Review task requirements carefully and seek clarification when needed. Consider additional training resources.";
+    return `
+COACHING & DEVELOPMENT COMMUNICATION
+${currentDate}
+
+Dear ${name},
+
+Following our performance review for ${position}, I want to provide you with specific guidance to help you improve your current performance score of ${score}%.
+
+CURRENT PERFORMANCE ASSESSMENT:
+Your recent performance indicates areas requiring immediate attention and focused development. This coaching communication outlines specific steps to help you succeed in your role.
+
+KEY AREAS FOR IMPROVEMENT:
+
+1. FUNDAMENTAL SKILLS DEVELOPMENT
+   • Review core competencies required for your position
+   • Complete relevant training modules within the next 2 weeks
+   • Schedule 1:1 meetings with your supervisor twice weekly
+   • Document questions and challenges for discussion
+
+2. TASK MANAGEMENT & QUALITY
+   • Carefully review all task requirements before beginning work
+   • Use checklists to ensure completeness
+   • Seek clarification immediately when uncertain
+   • Submit work for review before final completion
+
+3. COMMUNICATION & COLLABORATION
+   • Proactively communicate progress and obstacles
+   • Participate actively in team meetings
+   • Ask for help when needed - this shows initiative, not weakness
+   • Provide regular status updates on ongoing projects
+
+IMMEDIATE ACTION PLAN (Next 30 Days):
+□ Complete skills assessment with your manager
+□ Enroll in relevant training programs
+□ Establish daily check-in routine
+□ Set up weekly progress review meetings
+□ Create personal improvement tracking system
+
+RESOURCES AVAILABLE:
+• Online training library access
+• Mentoring program enrollment
+• Department expertise sharing sessions
+• Professional development budget allocation
+
+SUCCESS METRICS:
+We will measure improvement through:
+- Weekly performance score tracking
+- Task completion quality assessments
+- Peer feedback collections
+- Self-assessment evaluations
+
+NEXT STEPS:
+1. Schedule a follow-up meeting within 48 hours
+2. Begin implementing the action plan immediately
+3. Weekly progress reviews for the next month
+4. Comprehensive reassessment in 30 days
+
+Your development is important to us, and we are committed to providing the support you need to succeed. Please don't hesitate to reach out with questions or concerns.
+
+Best regards,
+AI Coaching & Development System
+Automated Performance Management
+`;
   } else if (score < 70) {
-    return "Good progress but room for improvement. Pay attention to quality metrics and time management. Regular check-ins recommended.";
+    return `
+COACHING & DEVELOPMENT COMMUNICATION
+${currentDate}
+
+Dear ${name},
+
+Thank you for your continued efforts in your role as ${position}. Your current performance score of ${score}% shows progress, though there are opportunities for further improvement.
+
+PERFORMANCE OVERVIEW:
+You're demonstrating good foundational skills and showing positive momentum. With focused effort in key areas, you can reach the next performance level.
+
+AREAS OF STRENGTH:
+✓ Showing consistent effort and engagement
+✓ Demonstrating basic competency in core tasks
+✓ Responsive to feedback and coaching
+✓ Maintains professional attitude and reliability
+
+GROWTH OPPORTUNITIES:
+
+1. QUALITY & ATTENTION TO DETAIL
+   • Implement self-review processes before task submission
+   • Use quality checklists and validation steps
+   • Allocate additional time for thorough work completion
+   • Seek peer review on important deliverables
+
+2. TIME MANAGEMENT & EFFICIENCY
+   • Develop better project planning and prioritization skills
+   • Break complex tasks into manageable components
+   • Set realistic deadlines with buffer time
+   • Track time usage to identify improvement areas
+
+3. PROFESSIONAL DEVELOPMENT
+   • Identify 2-3 specific skills to develop this quarter
+   • Attend relevant workshops or training sessions
+   • Read industry-related materials regularly
+   • Network with colleagues in similar roles
+
+DEVELOPMENT PLAN (Next 60 Days):
+□ Complete time management training module
+□ Establish quality review routine
+□ Set monthly skill development goals
+□ Schedule bi-weekly coaching sessions
+□ Join relevant professional development activities
+
+SUPPORT SYSTEM:
+• Regular check-ins with your supervisor
+• Access to internal training resources
+• Peer mentoring opportunities
+• Professional development stipend available
+
+MEASUREMENT & TRACKING:
+- Bi-weekly performance assessments
+- Quality metrics tracking
+- Time management efficiency reports
+- Goal achievement progress reviews
+
+Your improvement trajectory is encouraging, and with continued focus, you're positioned to achieve higher performance levels. Keep up the good work and maintain your positive momentum.
+
+Best regards,
+AI Coaching & Development System
+Automated Performance Management
+`;
   } else if (score < 80) {
-    return "Solid performance with minor areas for enhancement. Focus on consistency and meeting all task objectives.";
+    return `
+COACHING & DEVELOPMENT COMMUNICATION
+${currentDate}
+
+Dear ${name},
+
+Congratulations on maintaining solid performance in your role as ${position}. Your current score of ${score}% reflects competent execution of your responsibilities with room for excellence.
+
+PERFORMANCE HIGHLIGHTS:
+You consistently meet expectations and demonstrate reliability in your work. Your professional approach and steady performance are valued by the team.
+
+CURRENT STRENGTHS:
+✓ Consistent delivery of quality work
+✓ Reliable task completion within deadlines
+✓ Professional collaboration with team members
+✓ Responsive to feedback and direction
+✓ Strong foundational skills in core areas
+
+ENHANCEMENT OPPORTUNITIES:
+
+1. CONSISTENCY & RELIABILITY
+   • Strive for consistent high-quality output across all tasks
+   • Develop standardized personal processes
+   • Create templates and checklists for routine work
+   • Monitor performance metrics more closely
+
+2. PROACTIVE CONTRIBUTION
+   • Take initiative on process improvements
+   • Volunteer for challenging assignments
+   • Share knowledge and expertise with colleagues
+   • Contribute ideas during team meetings and planning sessions
+
+3. SKILL ADVANCEMENT
+   • Identify emerging trends in your field
+   • Develop expertise in new tools or methodologies
+   • Cross-train in adjacent skill areas
+   • Seek stretch assignments that challenge your abilities
+
+ADVANCEMENT PLAN (Next 90 Days):
+□ Set specific excellence targets for key performance areas
+□ Identify and pursue one advanced skill development opportunity
+□ Take on a leadership role in a team project
+□ Create and implement one process improvement
+□ Establish mentoring relationship (as mentor or mentee)
+
+GROWTH RESOURCES:
+• Advanced training program access
+• Conference and workshop attendance
+• Cross-functional project opportunities
+• Leadership development programs
+• External certification support
+
+SUCCESS METRICS:
+- Monthly performance trend analysis
+- Project leadership effectiveness
+- Peer feedback and collaboration scores
+- Innovation and improvement contributions
+- Advanced skill acquisition progress
+
+You're well-positioned for advancement and increased responsibility. Continue building on your solid foundation while pushing toward excellence in all areas.
+
+Best regards,
+AI Coaching & Development System
+Automated Performance Management
+`;
   } else {
-    return "Excellent work! Continue maintaining high standards and consider mentoring opportunities.";
+    return `
+RECOGNITION & DEVELOPMENT COMMUNICATION
+${currentDate}
+
+Dear ${name},
+
+Outstanding work! Your exceptional performance as ${position} with a score of ${score}% demonstrates your commitment to excellence and significant value to our organization.
+
+PERFORMANCE RECOGNITION:
+Your consistent high-quality work, leadership qualities, and positive impact on team dynamics make you a standout performer. Your contributions are recognized and appreciated.
+
+EXCEPTIONAL STRENGTHS:
+⭐ Consistently exceeds performance expectations
+⭐ Demonstrates leadership and mentoring capabilities
+⭐ Innovative problem-solving and process improvement
+⭐ Exceptional collaboration and team contribution
+⭐ High-quality deliverables with minimal supervision
+⭐ Proactive communication and professional growth
+
+LEADERSHIP & MENTORING OPPORTUNITIES:
+
+1. KNOWLEDGE SHARING & MENTORING
+   • Consider becoming a mentor for new team members
+   • Lead training sessions or workshops
+   • Document best practices and create knowledge resources
+   • Participate in cross-functional collaboration initiatives
+
+2. INNOVATION & PROCESS IMPROVEMENT
+   • Identify and lead process optimization projects
+   • Explore new technologies or methodologies
+   • Champion innovation initiatives within your team
+   • Contribute to strategic planning and decision-making
+
+3. CAREER ADVANCEMENT PREPARATION
+   • Discuss career advancement opportunities with management
+   • Develop skills for next-level responsibilities
+   • Build broader organizational network
+   • Consider additional certifications or advanced education
+
+EXCELLENCE CONTINUATION PLAN:
+□ Maintain current high-performance standards
+□ Take on increased leadership responsibilities
+□ Identify and develop emerging talent on the team
+□ Lead or contribute to strategic initiatives
+□ Explore advancement opportunities within the organization
+
+RECOGNITION BENEFITS:
+• Performance bonus consideration
+• Advancement opportunity prioritization
+• Special project assignment eligibility
+• Professional development investment
+• Recognition in team and organizational communications
+
+ADVANCED DEVELOPMENT:
+- Strategic leadership training programs
+- Executive coaching opportunities  
+- Advanced certification sponsorship
+- Conference speaking and networking opportunities
+- Cross-departmental project leadership
+
+Your exceptional performance sets the standard for excellence. We look forward to supporting your continued growth and recognizing your valuable contributions.
+
+Continue the outstanding work, and please don't hesitate to discuss career advancement opportunities or additional ways you can contribute to our organization's success.
+
+Best regards,
+AI Coaching & Development System
+Automated Performance Management
+`;
   }
 }
 
