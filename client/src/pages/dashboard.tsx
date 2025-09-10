@@ -1,0 +1,84 @@
+import { useQuery } from "@tanstack/react-query";
+import MetricsCards from "@/components/dashboard/metrics-cards";
+import EmployeeTable from "@/components/dashboard/employee-table";
+import RecentActions from "@/components/dashboard/recent-actions";
+import PipCards from "@/components/dashboard/pip-cards";
+import { Button } from "@/components/ui/button";
+import { Upload, FileText } from "lucide-react";
+import { Link } from "wouter";
+
+export default function Dashboard() {
+  const { data: dashboardMetrics, isLoading: metricsLoading } = useQuery({
+    queryKey: ['/api/dashboard-metrics'],
+  });
+
+  const { data: employees, isLoading: employeesLoading } = useQuery({
+    queryKey: ['/api/employees'],
+  });
+
+  const { data: activePips, isLoading: pipsLoading } = useQuery({
+    queryKey: ['/api/pips'],
+    queryFn: async () => {
+      const response = await fetch('/api/pips?active=true');
+      if (!response.ok) throw new Error('Failed to fetch PIPs');
+      return response.json();
+    }
+  });
+
+  const { data: auditLogs } = useQuery({
+    queryKey: ['/api/audit-logs'],
+  });
+
+  return (
+    <div className="flex-1 p-6 overflow-auto" data-testid="dashboard-content">
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-2" data-testid="dashboard-title">
+          Performance Dashboard
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          AI-driven talent management overview
+        </p>
+      </div>
+
+      <MetricsCards metrics={dashboardMetrics} isLoading={metricsLoading} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="lg:col-span-2">
+          <EmployeeTable employees={employees} isLoading={employeesLoading} />
+        </div>
+        
+        <div className="space-y-6">
+          <RecentActions auditLogs={auditLogs} />
+          
+          {/* Quick Data Upload Widget */}
+          <div className="bg-card rounded-lg border border-border">
+            <div className="p-4 border-b border-border">
+              <h3 className="font-semibold">Quick Data Upload</h3>
+            </div>
+            <div className="p-4">
+              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground mb-3">
+                  Upload employee performance CSV
+                </p>
+                <Link href="/data-upload">
+                  <Button size="sm" data-testid="button-upload-quick">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Select File
+                  </Button>
+                </Link>
+              </div>
+              <div className="mt-3">
+                <p className="text-xs text-muted-foreground">
+                  Supported format: CSV with employee_id, score, tasks_completed, date columns
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <PipCards pips={activePips} isLoading={pipsLoading} />
+    </div>
+  );
+}
