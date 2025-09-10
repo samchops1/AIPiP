@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 import { 
   Plus, 
   Calendar, 
@@ -22,6 +23,7 @@ interface PipCardsProps {
 export default function PipCards({ pips, isLoading }: PipCardsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   const generateCoachingMutation = useMutation({
     mutationFn: async ({ employeeId, score, pipId }: any) => {
@@ -210,6 +212,7 @@ export default function PipCards({ pips, isLoading }: PipCardsProps) {
                         size="sm" 
                         variant="outline" 
                         className="flex-1"
+                        onClick={() => setLocation('/pips')}
                         data-testid={`button-view-pip-details-${pip.id}`}
                       >
                         View Details
