@@ -303,7 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const employee = await storage.getEmployee(employeeId);
-      const feedback = generateCoachingFeedback(score, employee?.name, employee?.role);
+      const feedback = generateCoachingFeedback(score, employee?.name, employee?.role || "Employee");
       
       // Generate PDF for coaching session
       if (employee) {

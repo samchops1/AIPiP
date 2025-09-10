@@ -203,92 +203,234 @@ export function generatePIPPDF(
   pip: any,
   employee: any
 ): Promise<string> {
-  const doc = new PDFDocument();
+  const doc = new PDFDocument({ margin: 50 });
   const fileName = `PIP_${employee.id}_${Date.now()}.pdf`;
   const filePath = path.join(pdfDir, fileName);
   
   // Pipe to file
   doc.pipe(fs.createWriteStream(filePath));
   
-  // Header
-  doc.fontSize(20).text('PERFORMANCE IMPROVEMENT PLAN', { align: 'center' });
+  // Company Letterhead
+  doc.fillColor('#000000');
+  doc.fontSize(24).text('PERFORMANCE IMPROVEMENT PLAN', { align: 'center' });
+  doc.fontSize(12).fillColor('#666666').text('Official Documentation - Confidential', { align: 'center' });
+  doc.moveDown(2);
+  
+  // Document Information Box
+  doc.rect(50, doc.y, 500, 80).stroke();
+  const boxStartY = doc.y + 10;
+  doc.fontSize(10).fillColor('#000000');
+  doc.text(`Document ID: PIP-${pip.id}`, 60, boxStartY);
+  doc.text(`Issue Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 60, boxStartY + 15);
+  doc.text(`Effective Period: ${pip.startDate} to ${pip.endDate}`, 60, boxStartY + 30);
+  doc.text(`Review Period: ${pip.gracePeriodDays} days`, 60, boxStartY + 45);
+  doc.text(`Status: ${pip.status.toUpperCase()}`, 300, boxStartY);
+  doc.text(`Progress: ${pip.progress || 0}%`, 300, boxStartY + 15);
+  const daysRemaining = Math.max(0, Math.ceil((new Date(pip.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)));
+  doc.text(`Days Remaining: ${daysRemaining}`, 300, boxStartY + 30);
+  doc.y += 100;
+  
+  // Employee Information Section
+  doc.fontSize(16).fillColor('#1a365d').text('I. EMPLOYEE INFORMATION', { underline: true });
+  doc.moveDown(0.5);
+  doc.fontSize(12).fillColor('#000000');
+  
+  const empInfoTable = [
+    ['Employee Name:', employee.name],
+    ['Employee ID:', employee.id],
+    ['Department:', employee.department || 'General Operations'],
+    ['Position/Title:', employee.role || 'Team Member'],
+    ['Company:', employee.companyId || 'Organization'],
+    ['Direct Supervisor:', 'Performance Management Team'],
+    ['HR Representative:', 'Automated HR System']
+  ];
+  
+  empInfoTable.forEach(([label, value]) => {
+    doc.text(label, 50, doc.y, { width: 150, continued: true });
+    doc.text(value, 200, doc.y);
+    doc.moveDown(0.3);
+  });
   doc.moveDown();
   
-  // PIP Details
-  doc.fontSize(14).text('PIP Details:', { underline: true });
-  doc.fontSize(12);
-  doc.text(`PIP ID: ${pip.id}`);
-  doc.text(`Start Date: ${pip.startDate}`);
-  doc.text(`End Date: ${pip.endDate}`);
-  doc.text(`Grace Period: ${pip.gracePeriodDays} days`);
-  doc.text(`Status: ${pip.status}`);
-  doc.moveDown();
+  // Performance Analysis Section
+  doc.fontSize(16).fillColor('#1a365d').text('II. PERFORMANCE ANALYSIS', { underline: true });
+  doc.moveDown(0.5);
+  doc.fontSize(12).fillColor('#000000');
   
-  // Employee Information
-  doc.fontSize(14).text('Employee Information:', { underline: true });
-  doc.fontSize(12);
-  doc.text(`Name: ${employee.name}`);
-  doc.text(`Employee ID: ${employee.id}`);
-  doc.text(`Department: ${employee.department || 'N/A'}`);
-  doc.text(`Role: ${employee.role || 'N/A'}`);
-  doc.text(`Company: ${employee.companyId || 'N/A'}`);
-  doc.moveDown();
-  
-  // Performance Overview
-  doc.fontSize(14).text('Performance Overview:', { underline: true });
-  doc.fontSize(12);
-  doc.text(`Initial Score: ${pip.initialScore || 'N/A'}%`);
-  doc.text(`Current Score: ${pip.currentScore || 'N/A'}%`);
-  doc.text(`Required Improvement: ${pip.improvementRequired || 'N/A'}%`);
-  doc.text(`Current Progress: ${pip.progress || 0}%`);
-  
-  // Calculate improvement rate
-  if (pip.initialScore && pip.currentScore) {
-    const improvementRate = ((pip.currentScore - pip.initialScore) / pip.initialScore * 100).toFixed(2);
-    doc.text(`Improvement Rate: ${improvementRate}%`);
-  }
-  doc.moveDown();
-  
-  // Goals and Objectives
-  doc.fontSize(14).text('Goals and Objectives:', { underline: true });
-  doc.fontSize(11);
-  if (Array.isArray(pip.goals)) {
-    pip.goals.forEach((goal: string, index: number) => {
-      doc.text(`${index + 1}. ${goal}`, { indent: 20 });
-    });
-  }
-  doc.moveDown();
-  
-  // Coaching Plan
-  doc.fontSize(14).text('Coaching Plan:', { underline: true });
-  doc.fontSize(11);
-  doc.text(pip.coachingPlan, { align: 'justify' });
-  doc.moveDown();
-  
-  // Success Criteria
-  doc.fontSize(14).text('Success Criteria:', { underline: true });
-  doc.fontSize(11);
+  const currentScore = pip.currentScore || pip.initialScore || 65;
   const targetScore = (pip.initialScore || 70) + (pip.improvementRequired || 15);
-  doc.text(`• Achieve consistent performance score of ${targetScore}% or higher`);
-  doc.text(`• Complete all assigned goals and objectives`);
-  doc.text(`• Demonstrate sustained improvement in key areas`);
-  doc.text(`• Regular attendance at coaching sessions`);
+  const improvementNeeded = targetScore - currentScore;
+  
+  doc.text(`Current Performance Score: ${currentScore}% (Below Acceptable Threshold)`, { indent: 20 });
+  doc.text(`Initial Baseline Score: ${pip.initialScore || currentScore}%`, { indent: 20 });
+  doc.text(`Required Performance Target: ${targetScore}%`, { indent: 20 });
+  doc.text(`Improvement Required: ${improvementNeeded}%`, { indent: 20 });
+  
+  if (pip.initialScore && pip.currentScore && pip.currentScore > pip.initialScore) {
+    const improvementRate = ((pip.currentScore - pip.initialScore) / pip.initialScore * 100).toFixed(2);
+    doc.text(`Current Improvement Rate: +${improvementRate}%`, { indent: 20 });
+  }
   doc.moveDown();
   
-  // Important Notes
-  doc.fontSize(12).text('Important Notes:', { underline: true });
-  doc.fontSize(11);
-  doc.text('• This PIP is designed to support employee success');
-  doc.text('• Failure to meet requirements may result in termination');
-  doc.text('• All progress is documented and reviewed regularly');
-  doc.text('• Support resources are available throughout the process');
+  // Performance Deficiencies
+  doc.fontSize(14).fillColor('#d32f2f').text('Identified Performance Deficiencies:', { underline: true });
+  doc.fontSize(11).fillColor('#000000');
+  const deficiencies = [
+    'Consistent performance below company standards (70% minimum)',
+    'Insufficient task completion rate and quality metrics',
+    'Limited progress in skill development and competency areas',
+    'Need for improved time management and productivity'
+  ];
+  
+  deficiencies.forEach(deficiency => {
+    doc.text(`• ${deficiency}`, { indent: 25 });
+  });
   doc.moveDown();
+  
+  // Goals and Objectives Section
+  doc.fontSize(16).fillColor('#1a365d').text('III. PERFORMANCE IMPROVEMENT OBJECTIVES', { underline: true });
+  doc.moveDown(0.5);
+  doc.fontSize(12).fillColor('#000000');
+  
+  const objectives = pip.goals && Array.isArray(pip.goals) ? pip.goals : [
+    `Achieve and maintain a performance score of ${targetScore}% or higher`,
+    'Complete all assigned tasks within established deadlines',
+    'Demonstrate consistent quality improvement in work output',
+    'Actively participate in coaching sessions and skill development',
+    'Show measurable progress in identified competency gaps'
+  ];
+  
+  objectives.forEach((goal: string, index: number) => {
+    doc.fontSize(12).text(`${index + 1}. ${goal}`, { indent: 20 });
+    doc.fontSize(10).fillColor('#666666');
+    doc.text(`   Timeline: Ongoing throughout PIP period`, { indent: 25 });
+    doc.text(`   Measurement: Weekly performance reviews and metrics`, { indent: 25 });
+    doc.fillColor('#000000');
+    doc.moveDown(0.3);
+  });
+  doc.moveDown();
+  
+  // Support and Resources Section
+  doc.fontSize(16).fillColor('#1a365d').text('IV. SUPPORT PLAN & RESOURCES', { underline: true });
+  doc.moveDown(0.5);
+  doc.fontSize(12).fillColor('#000000');
+  
+  const supportPlan = pip.coachingPlan || 'The employee will receive comprehensive support including regular coaching sessions, skill development resources, and performance feedback to facilitate improvement.';
+  
+  doc.text('Coaching and Development Plan:', { underline: true });
+  doc.fontSize(11).text(supportPlan, { align: 'justify', indent: 20 });
+  doc.moveDown();
+  
+  doc.fontSize(12).text('Additional Support Resources:', { underline: true });
+  doc.fontSize(11);
+  const resources = [
+    'Weekly one-on-one coaching sessions with performance specialist',
+    'Access to professional development training materials',
+    'Skill assessment and personalized improvement recommendations',
+    'Regular feedback and progress monitoring',
+    'Peer mentoring and best practice sharing opportunities'
+  ];
+  
+  resources.forEach(resource => {
+    doc.text(`• ${resource}`, { indent: 25 });
+  });
+  doc.moveDown();
+  
+  // Success Criteria and Measurement
+  doc.fontSize(16).fillColor('#1a365d').text('V. SUCCESS CRITERIA & MEASUREMENT', { underline: true });
+  doc.moveDown(0.5);
+  doc.fontSize(12).fillColor('#000000');
+  
+  doc.text('Quantitative Measures:', { underline: true });
+  doc.fontSize(11);
+  doc.text(`• Achieve performance score of ${targetScore}% or higher`, { indent: 25 });
+  doc.text('• Maintain consistent performance for minimum 2 weeks', { indent: 25 });
+  doc.text('• Complete 100% of assigned tasks within deadlines', { indent: 25 });
+  doc.text('• Show measurable improvement in quality metrics', { indent: 25 });
+  doc.moveDown(0.5);
+  
+  doc.fontSize(12).text('Qualitative Measures:', { underline: true });
+  doc.fontSize(11);
+  doc.text('• Demonstrate improved initiative and problem-solving', { indent: 25 });
+  doc.text('• Show active engagement in coaching and development', { indent: 25 });
+  doc.text('• Display positive attitude toward feedback and improvement', { indent: 25 });
+  doc.text('• Collaborate effectively with team members and supervisors', { indent: 25 });
+  doc.moveDown();
+  
+  // New page for consequences and signatures
+  doc.addPage();
+  
+  // Consequences Section
+  doc.fontSize(16).fillColor('#d32f2f').text('VI. CONSEQUENCES OF NON-COMPLIANCE', { underline: true });
+  doc.moveDown(0.5);
+  doc.fontSize(12).fillColor('#000000');
+  
+  doc.text('Failure to meet the objectives outlined in this Performance Improvement Plan may result in:', { align: 'justify' });
+  doc.moveDown(0.3);
+  doc.fontSize(11);
+  doc.text('• Extension of the PIP period with modified objectives', { indent: 25 });
+  doc.text('• Transfer to a different role more suited to current skill level', { indent: 25 });
+  doc.text('• Demotion with corresponding adjustment to compensation', { indent: 25 });
+  doc.text('• Termination of employment in accordance with company policy', { indent: 25 });
+  doc.moveDown();
+  
+  doc.fontSize(12).fillColor('#d32f2f');
+  doc.text('IMPORTANT:', { underline: true });
+  doc.fontSize(11).fillColor('#000000');
+  doc.text('This Performance Improvement Plan is not disciplinary action but rather a supportive tool designed to help you succeed. However, it is a formal document that becomes part of your employment record. Your commitment to this process is essential for a successful outcome.', { align: 'justify' });
+  doc.moveDown();
+  
+  // Review Schedule
+  doc.fontSize(16).fillColor('#1a365d').text('VII. REVIEW SCHEDULE', { underline: true });
+  doc.moveDown(0.5);
+  doc.fontSize(12).fillColor('#000000');
+  
+  const reviewDates = [];
+  const startDate = new Date(pip.startDate);
+  const endDate = new Date(pip.endDate);
+  const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const reviewInterval = Math.floor(totalDays / 4);
+  
+  for (let i = 1; i <= 4; i++) {
+    const reviewDate = new Date(startDate);
+    reviewDate.setDate(startDate.getDate() + (reviewInterval * i));
+    reviewDates.push(reviewDate.toLocaleDateString('en-US'));
+  }
+  
+  doc.text('Scheduled Review Meetings:', { underline: true });
+  reviewDates.forEach((date, index) => {
+    doc.text(`Week ${(index + 1) * (totalDays / 28)}: ${date}`, { indent: 25 });
+  });
+  doc.text(`Final Review: ${endDate.toLocaleDateString('en-US')} (PIP Conclusion)`, { indent: 25 });
+  doc.moveDown();
+  
+  // Acknowledgment Section
+  doc.fontSize(16).fillColor('#1a365d').text('VIII. ACKNOWLEDGMENT', { underline: true });
+  doc.moveDown(0.5);
+  doc.fontSize(11).fillColor('#000000');
+  
+  doc.text('By proceeding with this Performance Improvement Plan, all parties acknowledge:', { align: 'justify' });
+  doc.text('• The employee has received and understands this PIP document', { indent: 20 });
+  doc.text('• The objectives and timeline have been clearly communicated', { indent: 20 });
+  doc.text('• Support resources and coaching will be made available', { indent: 20 });
+  doc.text('• Regular progress reviews will be conducted as scheduled', { indent: 20 });
+  doc.text('• This process is designed to support employee success', { indent: 20 });
+  doc.moveDown();
+  
+  // Signature Block
+  doc.rect(50, doc.y + 20, 500, 120).stroke();
+  doc.fontSize(12).text('SIGNATURES', 250, doc.y + 30, { align: 'center' });
+  
+  const sigY = doc.y + 60;
+  doc.text('Employee: _________________________ Date: _________', 60, sigY);
+  doc.text('HR Representative: _________________________ Date: _________', 60, sigY + 25);
+  doc.text('Direct Supervisor: _________________________ Date: _________', 60, sigY + 50);
   
   // Footer
-  doc.fontSize(10).fillColor('gray');
-  doc.text('Performance Improvement Program', { align: 'center' });
-  doc.text('Automated PIP Management System', { align: 'center' });
-  doc.text(`Generated on: ${new Date().toLocaleString()}`, { align: 'center' });
+  doc.fontSize(8).fillColor('#666666');
+  doc.text(`Document Generated: ${new Date().toLocaleString()}`, 50, doc.page.height - 50);
+  doc.text('Performance Improvement Plan - Confidential HR Document', 50, doc.page.height - 35);
+  doc.text(`Page 2 of 2 | PIP ID: ${pip.id}`, 400, doc.page.height - 35);
   
   // Finalize PDF and wait for completion
   return new Promise((resolve, reject) => {

@@ -121,18 +121,20 @@ export default function AutoFiringModal({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Warning Banner */}
-          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4 text-destructive" />
-              <span className="text-sm font-medium text-destructive">
-                Automated termination process in progress
-              </span>
+          {/* Warning Banner - Only show during processing */}
+          {!showResults && (
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-destructive" />
+                <span className="text-sm font-medium text-destructive">
+                  Automated termination process in progress
+                </span>
+              </div>
+              <p className="text-xs text-destructive/80 mt-1">
+                Evaluating employees based on consecutive poor performance and low utilization
+              </p>
             </div>
-            <p className="text-xs text-destructive/80 mt-1">
-              Evaluating employees based on consecutive poor performance and low utilization
-            </p>
-          </div>
+          )}
 
           {/* Progress Section */}
           <div className="space-y-4">
