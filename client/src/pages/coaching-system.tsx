@@ -27,6 +27,19 @@ export default function CoachingSystem() {
     queryKey: ['/api/employees'],
   });
 
+  const { data: activePips } = useQuery({
+    queryKey: ['/api/pips'],
+    queryFn: async () => {
+      const response = await fetch('/api/pips?active=true');
+      if (!response.ok) throw new Error('Failed to fetch PIPs');
+      return response.json();
+    }
+  });
+
+  const { data: performanceMetrics } = useQuery({
+    queryKey: ['/api/performance-metrics'],
+  });
+
   const { data: coachingSessions, isLoading: sessionsLoading } = useQuery({
     queryKey: ['/api/coaching-sessions', selectedEmployeeId],
     queryFn: async () => {
@@ -76,13 +89,71 @@ export default function CoachingSystem() {
     return type === 'automated' ? 'bg-primary/10 text-primary' : 'bg-accent/10 text-accent';
   };
 
+  const getEmployeePip = (employeeId: string) => {
+    return (activePips as any[])?.find((pip: any) => pip.employeeId === employeeId);
+  };
+
+  const getEmployeeLatestScore = (employeeId: string) => {
+    const empMetrics = (performanceMetrics as any[])?.filter((m: any) => m.employeeId === employeeId) || [];
+    if (empMetrics.length === 0) return null;
+    const latest = empMetrics.sort((a: any, b: any) => b.period - a.period)[0];
+    return latest?.score || null;
+  };
+
+  const autoGenerateCoachingForPips = useMutation({
+    mutationFn: async () => {
+      const results = [];
+      for (const pip of (activePips as any[]) || []) {
+        const latestScore = getEmployeeLatestScore(pip.employeeId);
+        if (latestScore) {
+          const response = await apiRequest("POST", "/api/generate-coaching", {
+            employeeId: pip.employeeId,
+            score: latestScore,
+            pipId: pip.id
+          });
+          results.push(await response.json());
+        }
+      }
+      return results;
+    },
+    onSuccess: (results) => {
+      toast({
+        title: "Bulk Coaching Generated",
+        description: `Generated coaching sessions for ${results.length} PIP employees.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/coaching-sessions'] });
+    },
+    onError: () => {
+      toast({
+        title: "Bulk Coaching Failed",
+        description: "Failed to generate coaching for PIP employees",
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
     <div className="flex-1 p-6 overflow-auto" data-testid="coaching-system-page">
       <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-2">Coaching System</h2>
-        <p className="text-sm text-muted-foreground">
-          Generate and manage coaching feedback for employees
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold mb-2">Coaching System</h2>
+            <p className="text-sm text-muted-foreground">
+              Generate and manage coaching feedback for employees
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <Button 
+              variant="outline"
+              onClick={() => autoGenerateCoachingForPips.mutate()}
+              disabled={autoGenerateCoachingForPips.isPending || !activePips || activePips.length === 0}
+              data-testid="button-bulk-coaching"
+            >
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Generate for PIPs ({(activePips as any[])?.length || 0})
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -126,10 +197,22 @@ export default function CoachingSystem() {
                     <div>
                       <p className="font-medium text-sm">{employee.name}</p>
                       <p className="text-xs text-muted-foreground">{employee.id}</p>
+                      {getEmployeePip(employee.id) && (
+                        <Badge variant="destructive" className="text-xs mt-1">
+                          On PIP
+                        </Badge>
+                      )}
                     </div>
-                    <Badge variant={employee.status === 'pip' ? 'destructive' : 'secondary'}>
-                      {employee.status}
-                    </Badge>
+                    <div className="text-right">
+                      <Badge variant={employee.status === 'pip' ? 'destructive' : 'secondary'} className="mb-1">
+                        {employee.status}
+                      </Badge>
+                      {getEmployeeLatestScore(employee.id) && (
+                        <p className="text-xs text-muted-foreground">
+                          Score: {getEmployeeLatestScore(employee.id)}%
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -210,6 +293,11 @@ export default function CoachingSystem() {
                               Score: {session.score}
                             </Badge>
                           )}
+                          {session.pipId && (
+                            <Badge variant="destructive" className="text-xs">
+                              PIP Session
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center text-xs text-muted-foreground">
                           <Calendar className="w-3 h-3 mr-1" />
@@ -220,8 +308,14 @@ export default function CoachingSystem() {
                       <p className="text-sm leading-relaxed">{session.feedback}</p>
                       
                       {session.pipId && (
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          Related to PIP: {session.pipId}
+                        <div className="mt-2 p-2 bg-destructive/5 rounded border border-destructive/20">
+                          <p className="text-xs text-destructive font-medium mb-1">
+                            Performance Improvement Plan Context
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            This coaching session is part of an active PIP (ID: {session.pipId}). 
+                            Focus areas include meeting improvement targets and following the structured development plan.
+                          </p>
                         </div>
                       )}
                     </div>
