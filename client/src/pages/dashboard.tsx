@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import MetricsCards from "@/components/dashboard/metrics-cards";
 import EmployeeTable from "@/components/dashboard/employee-table";
 import RecentActions from "@/components/dashboard/recent-actions";
 import PipCards from "@/components/dashboard/pip-cards";
+import AutoFiringModal from "@/components/modals/auto-firing-modal";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText, Database, Trash2, AlertTriangle, Users } from "lucide-react";
 import { Link } from "wouter";
@@ -11,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const [showAutoFiringModal, setShowAutoFiringModal] = useState(false);
+  const [terminatedEmployeesData, setTerminatedEmployeesData] = useState([]);
 
   const { data: dashboardMetrics, isLoading: metricsLoading } = useQuery({
     queryKey: ['/api/dashboard-metrics'],
@@ -80,14 +84,12 @@ export default function Dashboard() {
   const autoFireMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/auto-fire/demo'),
     onSuccess: (data: any) => {
+      setTerminatedEmployeesData(data.terminated || []);
+      setShowAutoFiringModal(true);
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
       queryClient.invalidateQueries({ queryKey: ['/api/terminated-employees'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['/api/audit-logs'] });
-      toast({
-        title: 'Auto-firing completed',
-        description: data.message
-      });
     },
     onError: () => {
       toast({
@@ -254,6 +256,13 @@ export default function Dashboard() {
       </div>
 
       <PipCards pips={activePips} isLoading={pipsLoading} />
+
+      {/* Auto-Firing Modal */}
+      <AutoFiringModal
+        isOpen={showAutoFiringModal}
+        onClose={() => setShowAutoFiringModal(false)}
+        employees={terminatedEmployeesData}
+      />
     </div>
   );
 }

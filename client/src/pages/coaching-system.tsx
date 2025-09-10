@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import CoachingFeedbackModal from "@/components/modals/coaching-feedback-modal";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { 
@@ -20,6 +21,8 @@ import {
 export default function CoachingSystem() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [showCoachingModal, setShowCoachingModal] = useState(false);
+  const [modalData, setModalData] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -59,11 +62,20 @@ export default function CoachingSystem() {
       });
       return response.json();
     },
-    onSuccess: () => {
-      toast({
-        title: "Coaching Generated",
-        description: "Automated coaching feedback has been created.",
-      });
+    onSuccess: (data, variables) => {
+      const employee = (employees as any[])?.find((e: any) => e.id === variables.employeeId);
+      if (employee) {
+        setModalData({
+          employee: {
+            id: employee.id,
+            name: employee.name,
+            role: employee.role,
+            score: variables.score
+          },
+          feedback: data.feedback
+        });
+        setShowCoachingModal(true);
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/coaching-sessions', selectedEmployeeId] });
     },
     onError: (error: any) => {
@@ -326,6 +338,16 @@ export default function CoachingSystem() {
           </Card>
         </div>
       </div>
+
+      {/* Coaching Feedback Modal */}
+      {modalData && (
+        <CoachingFeedbackModal
+          isOpen={showCoachingModal}
+          onClose={() => setShowCoachingModal(false)}
+          employee={modalData.employee}
+          feedback={modalData.feedback}
+        />
+      )}
     </div>
   );
 }
