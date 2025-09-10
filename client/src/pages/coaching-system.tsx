@@ -62,13 +62,13 @@ export default function CoachingSystem() {
     },
   });
 
-  const filteredEmployees = employees?.filter((employee: any) =>
+  const filteredEmployees = (employees as any[])?.filter((employee: any) =>
     employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     employee.id.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
   const getEmployeeName = (employeeId: string) => {
-    const employee = employees?.find((e: any) => e.id === employeeId);
+    const employee = (employees as any[])?.find((e: any) => e.id === employeeId);
     return employee?.name || employeeId;
   };
 

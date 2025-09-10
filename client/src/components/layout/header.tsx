@@ -14,7 +14,7 @@ export default function Header() {
 
   // Count recent notifications (logs from today)
   const today = new Date().toISOString().split('T')[0];
-  const todayLogs = auditLogs?.filter((log: any) => 
+  const todayLogs = (auditLogs as any[])?.filter((log: any) => 
     log.timestamp && log.timestamp.toString().startsWith(today)
   ) || [];
 
@@ -32,10 +32,10 @@ export default function Header() {
           {/* System Status */}
           <div className="flex items-center space-x-2" data-testid="system-status">
             <div className={`w-2 h-2 rounded-full ${
-              systemSettings?.killSwitchActive ? 'bg-destructive' : 'bg-accent'
+(systemSettings as any)?.killSwitchActive ? 'bg-destructive' : 'bg-accent'
             }`} />
             <span className="text-sm text-muted-foreground">
-              {systemSettings?.killSwitchActive ? 'System Paused' : 'System Active'}
+              {(systemSettings as any)?.killSwitchActive ? 'System Paused' : 'System Active'}
             </span>
           </div>
           

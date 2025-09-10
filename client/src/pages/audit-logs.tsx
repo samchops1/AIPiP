@@ -23,7 +23,7 @@ export default function AuditLogs() {
     queryKey: ['/api/audit-logs'],
   });
 
-  const filteredLogs = auditLogs?.filter((log: any) => {
+  const filteredLogs = (auditLogs as any[])?.filter((log: any) => {
     const matchesSearch = !searchTerm || 
       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.entityId.toLowerCase().includes(searchTerm.toLowerCase()) ||

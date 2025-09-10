@@ -79,7 +79,7 @@ export default function Sidebar() {
             <div 
               className={cn(
                 "w-2 h-2 rounded-full",
-                systemSettings?.killSwitchActive ? "bg-destructive" : "bg-accent"
+(systemSettings as any)?.killSwitchActive ? "bg-destructive" : "bg-accent"
               )}
               data-testid="system-status-indicator"
             />
@@ -88,14 +88,14 @@ export default function Sidebar() {
             <button 
               className={cn(
                 "w-full px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                systemSettings?.killSwitchActive
+(systemSettings as any)?.killSwitchActive
                   ? "bg-accent text-accent-foreground hover:bg-accent/90"
                   : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
               )}
               data-testid="emergency-controls-button"
             >
               <Shield className="w-4 h-4 mr-2 inline" />
-              {systemSettings?.killSwitchActive ? "System Paused" : "Kill Switch"}
+              {(systemSettings as any)?.killSwitchActive ? "System Paused" : "Kill Switch"}
             </button>
           </Link>
         </div>

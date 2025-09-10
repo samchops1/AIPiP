@@ -38,7 +38,7 @@ export default function EmployeeTable({ employees, isLoading }: EmployeeTablePro
   }
 
   const getEmployeeMetrics = (employeeId: string) => {
-    const empMetrics = performanceMetrics?.filter((m: any) => m.employeeId === employeeId) || [];
+    const empMetrics = (performanceMetrics as any[])?.filter((m: any) => m.employeeId === employeeId) || [];
     if (empMetrics.length === 0) return { latestScore: 0, trend: 0 };
     
     const sorted = empMetrics.sort((a: any, b: any) => b.period - a.period);

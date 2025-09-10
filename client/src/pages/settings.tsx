@@ -47,7 +47,7 @@ export default function Settings() {
   });
 
   const toggleKillSwitch = () => {
-    if (settings?.killSwitchActive) {
+    if ((settings as any)?.killSwitchActive) {
       // Deactivating kill switch - no confirmation needed
       updateSettingsMutation.mutate({ killSwitchActive: false });
     } else {
@@ -101,24 +101,24 @@ export default function Settings() {
                 <div className="flex items-center space-x-2">
                   <span className="font-medium">Kill Switch</span>
                   <div className={`w-2 h-2 rounded-full ${
-                    settings?.killSwitchActive ? 'bg-destructive' : 'bg-accent'
+                    (settings as any)?.killSwitchActive ? 'bg-destructive' : 'bg-accent'
                   }`} />
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {settings?.killSwitchActive 
+                  {(settings as any)?.killSwitchActive 
                     ? "All automated workflows are paused" 
                     : "System is active and processing automated workflows"
                   }
                 </p>
               </div>
               <Button
-                variant={settings?.killSwitchActive ? "outline" : "destructive"}
+                variant={(settings as any)?.killSwitchActive ? "outline" : "destructive"}
                 onClick={toggleKillSwitch}
                 disabled={updateSettingsMutation.isPending}
                 data-testid="button-kill-switch"
               >
                 <Shield className="w-4 h-4 mr-2" />
-                {settings?.killSwitchActive ? "Reactivate System" : "Emergency Stop"}
+                {(settings as any)?.killSwitchActive ? "Reactivate System" : "Emergency Stop"}
               </Button>
             </div>
           </CardContent>
@@ -142,7 +142,7 @@ export default function Settings() {
                     type="number"
                     min="0"
                     max="100"
-                    value={settings?.minScoreThreshold || 70}
+                    value={(settings as any)?.minScoreThreshold || 70}
                     onChange={(e) => handleSettingChange('minScoreThreshold', parseFloat(e.target.value))}
                     disabled={updateSettingsMutation.isPending}
                     data-testid="input-min-score-threshold"
@@ -161,7 +161,7 @@ export default function Settings() {
                   type="number"
                   min="1"
                   max="10"
-                  value={settings?.consecutiveLowPeriods || 3}
+                  value={(settings as any)?.consecutiveLowPeriods || 3}
                   onChange={(e) => handleSettingChange('consecutiveLowPeriods', parseInt(e.target.value))}
                   disabled={updateSettingsMutation.isPending}
                   className="mt-1"
@@ -180,7 +180,7 @@ export default function Settings() {
                     type="number"
                     min="7"
                     max="90"
-                    value={settings?.defaultGracePeriod || 21}
+                    value={(settings as any)?.defaultGracePeriod || 21}
                     onChange={(e) => handleSettingChange('defaultGracePeriod', parseInt(e.target.value))}
                     disabled={updateSettingsMutation.isPending}
                     data-testid="input-grace-period"
@@ -200,7 +200,7 @@ export default function Settings() {
                     type="number"
                     min="5"
                     max="50"
-                    value={settings?.minImprovementPercent || 10}
+                    value={(settings as any)?.minImprovementPercent || 10}
                     onChange={(e) => handleSettingChange('minImprovementPercent', parseFloat(e.target.value))}
                     disabled={updateSettingsMutation.isPending}
                     data-testid="input-min-improvement"
@@ -245,13 +245,13 @@ export default function Settings() {
               <div>
                 <span className="text-muted-foreground">Last Updated:</span>
                 <p className="font-medium">
-                  {settings?.updatedAt ? new Date(settings.updatedAt).toLocaleString() : 'Never'}
+                  {(settings as any)?.updatedAt ? new Date((settings as any).updatedAt).toLocaleString() : 'Never'}
                 </p>
               </div>
               <div>
                 <span className="text-muted-foreground">System Status:</span>
-                <p className={`font-medium ${settings?.killSwitchActive ? 'text-destructive' : 'text-accent'}`}>
-                  {settings?.killSwitchActive ? 'Emergency Mode' : 'Active'}
+                <p className={`font-medium ${(settings as any)?.killSwitchActive ? 'text-destructive' : 'text-accent'}`}>
+                  {(settings as any)?.killSwitchActive ? 'Emergency Mode' : 'Active'}
                 </p>
               </div>
             </div>

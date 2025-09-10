@@ -60,7 +60,7 @@ export default function PipManagement() {
   });
 
   const getEmployeeName = (employeeId: string) => {
-    const employee = employees?.find((e: any) => e.id === employeeId);
+    const employee = (employees as any[])?.find((e: any) => e.id === employeeId);
     return employee?.name || employeeId;
   };
 

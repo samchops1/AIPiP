@@ -36,6 +36,11 @@ waitForPort = 5000
 
 [[ports]]
 localPort = 1455
+externalPort = 1455
+exposeLocalhost = true
+
+[[ports]]
+localPort = 1455
 externalPort = 3000
 exposeLocalhost = true
 
@@ -44,4 +49,4 @@ localPort = 5000
 externalPort = 80
 
 [agent]
-integrations = ["javascript_mem_db==1.0.0", "javascript_object_storage==1.0.0"]
+integrations = ["javascript_mem_db==1.0.0", "javascript_object_storage==1.0.0", "javascript_openai==1.0.0"]

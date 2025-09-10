@@ -84,6 +84,10 @@ export class MemStorage implements IStorage {
   async createEmployee(insertEmployee: InsertEmployee): Promise<Employee> {
     const employee: Employee = {
       ...insertEmployee,
+      role: insertEmployee.role || null,
+      email: insertEmployee.email || null,
+      department: insertEmployee.department || null,
+      managerId: insertEmployee.managerId || null,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -157,6 +161,9 @@ export class MemStorage implements IStorage {
     const pip: Pip = {
       ...insertPip,
       id,
+      progress: insertPip.progress || 0,
+      initialScore: insertPip.initialScore || null,
+      currentScore: insertPip.currentScore || null,
       createdAt: new Date()
     };
     this.pips.set(id, pip);
@@ -184,6 +191,8 @@ export class MemStorage implements IStorage {
     const session: CoachingSession = {
       ...insertSession,
       id,
+      score: insertSession.score || null,
+      pipId: insertSession.pipId || null,
       createdAt: new Date()
     };
     this.coachingSessions.set(id, session);
@@ -201,6 +210,7 @@ export class MemStorage implements IStorage {
     const log: AuditLog = {
       ...insertLog,
       id,
+      userId: insertLog.userId || null,
       timestamp: new Date()
     };
     this.auditLogs.set(id, log);
