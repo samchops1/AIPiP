@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -115,6 +115,9 @@ export default function AutoFiringModal({
             <AlertTriangle className="w-5 h-5 text-orange-500" />
             <span>Automated Termination System</span>
           </DialogTitle>
+          <DialogDescription>
+            Review and execute automated termination decisions based on performance criteria. This demo shows potential terminations with detailed reasoning.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">

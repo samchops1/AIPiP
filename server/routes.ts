@@ -13,6 +13,12 @@ import {
 import { z } from "zod";
 import * as fs from 'fs';
 import * as path from 'path';
+import { 
+  generateTerminationPDF, 
+  generateCoachingPDF, 
+  generatePIPPDF,
+  generateBulkPerformanceReportPDF 
+} from "./pdfGenerator";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -297,6 +303,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const feedback = generateCoachingFeedback(score);
+      
+      // Generate PDF for coaching session
+      const employee = await storage.getEmployee(employeeId);
+      if (employee) {
+        const pdfPath = await generateCoachingPDF(
+          employee.name,
+          employeeId,
+          new Date().toISOString().split('T')[0],
+          score,
+          feedback,
+          "automated",
+          pipId
+        );
+      }
+      
       const session = await storage.createCoachingSession({
         employeeId,
         pipId,
@@ -779,6 +800,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               `Average utilization: ${Math.round(employeeMetrics.reduce((sum, m) => sum + m.utilization, 0) / employeeMetrics.length)}%`
             ];
 
+            // Generate PDF for termination
+            const pdfPath = await generateTerminationPDF(
+              employee.name,
+              employee.id,
+              employee.role || "Employee",
+              latestMetric.score,
+              latestMetric.utilization,
+              reasons,
+              new Date().toISOString().split('T')[0]
+            );
+
             // Update employee status
             await storage.updateEmployee(employee.id, { status: "terminated" });
 
@@ -845,8 +877,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/sample-data/generate', async (req, res) => {
     try {
-      await generateSampleData(storage);
-      res.json({ success: true, message: 'Sample data generated successfully' });
+      const results = await generateSampleData(storage);
+      
+      // Automatically trigger PIP evaluation after sample data
+      console.log('Running automatic PIP evaluation...');
+      const pipResults = await evaluatePIPCandidates();
+      
+      // Automatically run bias check
+      console.log('Running automatic bias check...');
+      const employees = await storage.getAllEmployees();
+      const biasResults = [];
+      for (const employee of employees) {
+        const metrics = await storage.getPerformanceMetrics(employee.id);
+        if (metrics.length > 0) {
+          const variance = calculateVariance(metrics.map((m: any) => m.score));
+          if (variance > 20) {
+            biasResults.push({
+              employeeId: employee.id,
+              variance
+            });
+          }
+        }
+      }
+      
+      // Generate performance report PDF
+      const allMetrics = await storage.getAllPerformanceMetrics();
+      const pips = await storage.getAllPips();
+      const improvementRate = results.improvementRate || 0;
+      const reportPath = await generateBulkPerformanceReportPDF(
+        employees,
+        allMetrics,
+        pips,
+        improvementRate
+      );
+      
+      res.json({ 
+        success: true, 
+        message: 'Sample data generated with auto-actions triggered',
+        results: {
+          ...results,
+          pipEvaluation: pipResults,
+          biasDetected: biasResults.length,
+          performanceReportPDF: reportPath
+        }
+      });
     } catch (error) {
       console.error('Error generating sample data:', error);
       res.status(500).json({ error: 'Internal server error' });
@@ -896,6 +970,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error generating PIP document:', error);
       res.status(500).json({ error: 'Failed to generate PIP document' });
+    }
+  });
+
+  // PDF download endpoints
+  app.get('/api/download-pdf/:filename', async (req, res) => {
+    try {
+      const { filename } = req.params;
+      const pdfPath = path.join(process.cwd(), 'generated_pdfs', filename);
+      
+      if (!fs.existsSync(pdfPath)) {
+        return res.status(404).json({ error: 'PDF not found' });
+      }
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      const fileStream = fs.createReadStream(pdfPath);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      res.status(500).json({ error: 'Failed to download PDF' });
+    }
+  });
+
+  // List available PDFs
+  app.get('/api/list-pdfs', async (req, res) => {
+    try {
+      const pdfDir = path.join(process.cwd(), 'generated_pdfs');
+      if (!fs.existsSync(pdfDir)) {
+        return res.json({ pdfs: [] });
+      }
+      
+      const files = fs.readdirSync(pdfDir)
+        .filter(file => file.endsWith('.pdf'))
+        .map(file => {
+          const stats = fs.statSync(path.join(pdfDir, file));
+          return {
+            filename: file,
+            created: stats.birthtime,
+            size: stats.size
+          };
+        })
+        .sort((a, b) => b.created.getTime() - a.created.getTime());
+      
+      res.json({ pdfs: files });
+    } catch (error) {
+      console.error('Error listing PDFs:', error);
+      res.status(500).json({ error: 'Failed to list PDFs' });
     }
   });
 
@@ -1037,13 +1159,18 @@ function calculateVariance(numbers: number[]): number {
   return squaredDiffs.reduce((a, b) => a + b, 0) / numbers.length;
 }
 
-// Enhanced sample data generation with company IDs
+// Enhanced sample data generation with company IDs and 50 PIP employees
 async function generateSampleData(storage: any) {
   // Generate 200 companies
   const companies = [];
   for (let i = 1; i <= 200; i++) {
     companies.push(`C${i.toString().padStart(3, '0')}`);
   }
+  
+  // Track PIP employees and improvement metrics
+  const pipEmployees = [];
+  let totalImproved = 0;
+  let totalPips = 0;
   
   const employees = [
     {
@@ -1108,7 +1235,7 @@ async function generateSampleData(storage: any) {
     }
   ];
   
-  // Generate additional employees for scale (1000+ total)
+  // Generate additional employees for scale (1000+ total) with 50 PIP employees
   const roles = ["Engineer", "Manager", "Analyst", "Designer", "Sales", "Support", "Marketing"];
   const departments = ["Engineering", "Product", "Sales", "Marketing", "Support", "Data", "Design"];
   const firstNames = ["John", "Jane", "Mike", "Lisa", "Tom", "Amy", "Chris", "Pat", "Sam", "Alex"];
@@ -1121,16 +1248,25 @@ async function generateSampleData(storage: any) {
     const role = roles[Math.floor(Math.random() * roles.length)];
     const department = departments[Math.floor(Math.random() * departments.length)];
     
-    employees.push({
+    // Make first 50 additional employees PIP candidates
+    const isPipCandidate = i >= 7 && i <= 56;
+    
+    const employee = {
       id: `emp-${i.toString().padStart(3, '0')}`,
       name: `${firstName} ${lastName}`,
       role,
       email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${i}@company.com`,
       department,
-      status: "active",
+      status: isPipCandidate ? "pip" : "active",
       managerId: null,
       companyId
-    });
+    };
+    
+    employees.push(employee);
+    
+    if (isPipCandidate) {
+      pipEmployees.push(employee);
+    }
   }
 
   // Create employees in batches for performance
@@ -1278,9 +1414,101 @@ async function generateSampleData(storage: any) {
     date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   });
 
-  // Generate performance metrics for additional employees (sample for first 100)
+  // Generate performance metrics for all employees including PIP candidates
   const metricsCurrentPeriod = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
-  for (let empIndex = 7; empIndex <= Math.min(100, employees.length); empIndex++) {
+  
+  // Generate metrics for PIP employees (showing improvement)
+  for (const pipEmp of pipEmployees) {
+    const initialScore = Math.floor(Math.random() * 15) + 55; // 55-70 initial
+    const improved = Math.random() > 0.3; // 70% improvement rate
+    
+    if (improved) totalImproved++;
+    totalPips++;
+    
+    for (let i = 0; i < 12; i++) {
+      let score, utilization;
+      
+      if (i < 6) {
+        // Poor performance initially
+        score = initialScore + Math.floor(Math.random() * 5) - 2;
+        utilization = Math.floor(Math.random() * 10) + 50;
+      } else {
+        // Show improvement or continued poor performance
+        if (improved) {
+          score = Math.floor(Math.random() * 10) + 75; // Improved to 75-85
+          utilization = Math.floor(Math.random() * 10) + 70; // Better utilization
+        } else {
+          score = initialScore + Math.floor(Math.random() * 5);
+          utilization = Math.floor(Math.random() * 10) + 45;
+        }
+      }
+      
+      await storage.createPerformanceMetric({
+        employeeId: pipEmp.id,
+        period: metricsCurrentPeriod - i,
+        score,
+        utilization,
+        tasksCompleted: Math.floor(Math.random() * 8) + 8,
+        date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      });
+    }
+    
+    // Create PIP record with PDF
+    const pipStartDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const pipEndDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    const pip = await storage.createPip({
+      employeeId: pipEmp.id,
+      startDate: pipStartDate,
+      endDate: pipEndDate,
+      gracePeriodDays: 30,
+      goals: [
+        "Achieve 75% average performance score",
+        "Maintain 70% utilization rate",
+        "Complete all assigned tasks on time",
+        "Attend weekly coaching sessions"
+      ],
+      coachingPlan: "Weekly 1:1 sessions with manager, bi-weekly skill training, daily task reviews",
+      initialScore: initialScore,
+      currentScore: improved ? 78 : initialScore + 2,
+      progress: improved ? 75 : 25,
+      improvementRequired: 15,
+      status: "active"
+    });
+    
+    // Generate PIP PDF
+    await generatePIPPDF(pip, pipEmp);
+    
+    // Create coaching sessions with PDFs
+    for (let week = 0; week < 4; week++) {
+      const sessionDate = new Date(Date.now() - (week * 7 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+      const sessionScore = improved ? 70 + (week * 2) : initialScore + (week * 0.5);
+      const feedback = generateCoachingFeedback(sessionScore);
+      
+      await storage.createCoachingSession({
+        employeeId: pipEmp.id,
+        pipId: pip.id,
+        type: "automated",
+        feedback,
+        score: sessionScore,
+        date: sessionDate
+      });
+      
+      // Generate coaching PDF
+      await generateCoachingPDF(
+        pipEmp.name,
+        pipEmp.id,
+        sessionDate,
+        sessionScore,
+        feedback,
+        "automated",
+        pip.id
+      );
+    }
+  }
+  
+  // Generate metrics for other employees (sample)
+  for (let empIndex = 57; empIndex <= Math.min(150, employees.length); empIndex++) {
     const emp = employees[empIndex - 1];
     for (let i = 0; i < 8; i++) {
       const isHighPerformer = Math.random() > 0.3;
@@ -1295,6 +1523,9 @@ async function generateSampleData(storage: any) {
     }
   }
   
+  // Calculate improvement rate
+  const improvementRate = totalPips > 0 ? (totalImproved / totalPips * 100) : 0;
+  
   // Generate audit logs for sample actions
   await storage.createAuditLog({
     action: "sample_data_generated",
@@ -1303,20 +1534,43 @@ async function generateSampleData(storage: any) {
     details: { 
       employeesCreated: employees.length, 
       companiesCreated: companies.length,
-      metricsGenerated: "800+ performance records",
-      portfolioScale: "200 companies, 1000+ employees"
+      pipEmployeesCreated: pipEmployees.length,
+      improvementRate: `${improvementRate.toFixed(2)}%`,
+      metricsGenerated: "1500+ performance records",
+      portfolioScale: "200 companies, 1000+ employees",
+      pdfsGenerated: "Multiple PDFs for PIPs and coaching sessions"
     }
   });
+  
+  return {
+    employeesCreated: employees.length,
+    pipEmployees: pipEmployees.length,
+    improvementRate,
+    companiesCreated: companies.length
+  };
 }
 
 async function clearAllData(storage: any) {
-  // Note: This would clear all data - implementation depends on storage interface
+  // Clear all data from storage
+  storage.employees.clear();
+  storage.performanceMetrics.clear();
+  storage.pips.clear();
+  storage.coachingSessions.clear();
+  storage.terminatedEmployees.clear();
+  storage.auditLogs.clear();
+  
+  // Create final audit log
   await storage.createAuditLog({
     action: "all_data_cleared",
     entityType: "system", 
     entityId: "system",
-    details: { timestamp: new Date().toISOString() }
+    details: { 
+      timestamp: new Date().toISOString(),
+      message: "All employees, metrics, PIPs, coaching sessions, and terminated employee records cleared"
+    }
   });
+  
+  console.log('All data cleared from storage');
 }
 
 async function evaluateTerminationCandidates() {

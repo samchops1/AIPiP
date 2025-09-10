@@ -155,7 +155,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="text-xs text-muted-foreground">
-                Includes: 6 employees, performance metrics, active PIPs, coaching sessions
+                Includes: 1000+ employees, performance metrics, active PIPs, coaching sessions
               </div>
             </div>
           </div>

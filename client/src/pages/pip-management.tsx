@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -209,6 +209,9 @@ export default function PipManagement() {
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Create New Performance Improvement Plan</DialogTitle>
+                <DialogDescription>
+                  Set up a structured performance improvement plan for an employee with goals, coaching schedule, and timeline.
+                </DialogDescription>
               </DialogHeader>
               <Form {...createPipForm}>
                 <form onSubmit={createPipForm.handleSubmit((data) => createPipMutation.mutate(data))} className="space-y-4">

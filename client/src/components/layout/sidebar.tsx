@@ -51,19 +51,18 @@ export default function Sidebar() {
             
             return (
               <li key={item.name}>
-                <Link href={item.href}>
-                  <a
-                    className={cn(
-                      "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-foreground hover:bg-secondary"
-                    )}
-                    data-testid={`nav-link-${item.href === "/" ? "dashboard" : item.href.slice(1)}`}
-                  >
-                    <Icon className="w-5 h-5 mr-3" />
-                    {item.name}
-                  </a>
+                <Link 
+                  href={item.href}
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-foreground hover:bg-secondary"
+                  )}
+                  data-testid={`nav-link-${item.href === "/" ? "dashboard" : item.href.slice(1)}`}
+                >
+                  <Icon className="w-5 h-5 mr-3" />
+                  {item.name}
                 </Link>
               </li>
             );
@@ -84,19 +83,18 @@ export default function Sidebar() {
               data-testid="system-status-indicator"
             />
           </div>
-          <Link href="/settings">
-            <button 
-              className={cn(
-                "w-full px-3 py-2 rounded-md text-sm font-medium transition-colors",
+          <Link 
+            href="/settings"
+            className={cn(
+              "w-full px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center",
 (systemSettings as any)?.killSwitchActive
-                  ? "bg-accent text-accent-foreground hover:bg-accent/90"
-                  : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              )}
-              data-testid="emergency-controls-button"
-            >
-              <Shield className="w-4 h-4 mr-2 inline" />
-              {(systemSettings as any)?.killSwitchActive ? "System Paused" : "Kill Switch"}
-            </button>
+                ? "bg-accent text-accent-foreground hover:bg-accent/90"
+                : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            )}
+            data-testid="emergency-controls-button"
+          >
+            <Shield className="w-4 h-4 mr-2" />
+            {(systemSettings as any)?.killSwitchActive ? "System Paused" : "Kill Switch"}
           </Link>
         </div>
       </div>
