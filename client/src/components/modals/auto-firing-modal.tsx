@@ -15,6 +15,7 @@ interface AutoFiringModalProps {
     finalScore: number;
     finalUtilization: number;
     reason: string;
+    terminationLetter?: string;
   }>;
 }
 
@@ -55,7 +56,7 @@ export default function AutoFiringModal({
                 setCurrentEmployeeIndex(prevIndex => 
                   prevIndex < employees.length - 1 ? prevIndex + 1 : prevIndex
                 );
-              }, 800);
+              }, 600);
             }
             
             if (prev === steps.length - 2) {
@@ -67,7 +68,7 @@ export default function AutoFiringModal({
           clearInterval(timer);
           return prev;
         });
-      }, 2000);
+      }, 1500);
 
       return () => clearInterval(timer);
     }
@@ -187,21 +188,38 @@ export default function AutoFiringModal({
                       <div className="text-sm font-medium text-destructive mb-2">
                         ⚠️ {employees.length} employee(s) terminated due to poor performance
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {employees.map((employee) => (
-                          <div key={employee.id} className="flex items-center justify-between py-2 border-b border-destructive/10 last:border-0">
-                            <div>
-                              <div className="font-medium">{employee.name}</div>
-                              <div className="text-xs text-muted-foreground">{employee.reason}</div>
+                          <div key={employee.id} className="border border-destructive/20 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <div className="font-medium">{employee.name}</div>
+                                <div className="text-xs text-muted-foreground">{employee.role}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  Final Score: {employee.finalScore}% | Utilization: {employee.finalUtilization}%
+                                </div>
+                              </div>
+                              <Badge variant="destructive">TERMINATED</Badge>
                             </div>
-                            <Badge variant="destructive">TERMINATED</Badge>
+                            
+                            {employee.terminationLetter && (
+                              <div className="mt-3 bg-muted/50 rounded p-3 border">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <FileText className="w-4 h-4 text-muted-foreground" />
+                                  <span className="text-sm font-medium">Termination Letter</span>
+                                </div>
+                                <div className="text-xs bg-white/50 rounded border p-2 max-h-32 overflow-y-auto">
+                                  <pre className="whitespace-pre-wrap text-xs">{employee.terminationLetter}</pre>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
                     </div>
                     
-                    <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded">
-                      📄 Termination letters have been automatically generated with performance data and specific reasons. All actions have been logged for audit compliance.
+                    <div className="text-xs text-muted-foreground bg-accent/10 border border-accent/20 p-3 rounded">
+                      📄 Termination letters have been automatically generated with current date, performance data and specific reasons. All actions have been logged for audit compliance.
                     </div>
                   </div>
                 ) : (

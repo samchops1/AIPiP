@@ -448,7 +448,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               role: employee.role,
               finalScore: latestMetric.score,
               finalUtilization: latestMetric.utilization,
-              reason: "Consecutive poor performance and low utilization"
+              reason: "Consecutive poor performance and low utilization",
+              terminationLetter: generateTerminationLetter(
+                employee.name,
+                employee.role || "Employee",
+                latestMetric.score,
+                latestMetric.utilization,
+                reasons
+              )
             });
           }
         }
@@ -679,7 +686,7 @@ async function generateSampleData(storage: any) {
       role: "QA Engineer",
       email: "marcus.johnson@company.com",
       department: "Engineering",
-      status: "pip",
+      status: "active",
       managerId: null
     },
     {
@@ -688,7 +695,7 @@ async function generateSampleData(storage: any) {
       role: "Designer",
       email: "emily.rodriguez@company.com",
       department: "Design",
-      status: "active",
+      status: "pip",
       managerId: null
     },
     {
@@ -745,13 +752,13 @@ async function generateSampleData(storage: any) {
     });
   }
 
-  // Marcus Johnson - Struggling performer (should be on PIP)
+  // Marcus Johnson - Struggling performer (should be terminated)
   for (let i = 0; i < 12; i++) {
     await storage.createPerformanceMetric({
       employeeId: "emp-003",
       period: currentPeriod - i,
-      score: Math.floor(Math.random() * 15) + 50, // 50-65
-      utilization: Math.floor(Math.random() * 15) + 45, // 45-60% poor utilization
+      score: Math.floor(Math.random() * 15) + 50, // 50-65 (below 70 threshold)
+      utilization: Math.floor(Math.random() * 12) + 45, // 45-57% (always below 60 threshold)
       tasksCompleted: Math.floor(Math.random() * 3) + 8, // 8-11
       date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
@@ -770,15 +777,15 @@ async function generateSampleData(storage: any) {
     });
   }
 
-  // David Kim - Good performer with slight decline
+  // David Kim - Severe performance decline (should be terminated)
   for (let i = 0; i < 12; i++) {
-    const baseScore = i < 3 ? 68 : 78; // Recent decline
-    const baseUtilization = i < 3 ? 65 : 75; // Declining utilization 
+    const baseScore = i < 4 ? 55 : 78; // Recent severe decline
+    const baseUtilization = i < 4 ? 45 : 75; // Severe utilization drop
     await storage.createPerformanceMetric({
       employeeId: "emp-005",
       period: currentPeriod - i,
       score: Math.floor(Math.random() * 8) + baseScore,
-      utilization: Math.floor(Math.random() * 8) + baseUtilization, // 65-83%
+      utilization: Math.floor(Math.random() * 8) + baseUtilization,
       tasksCompleted: Math.floor(Math.random() * 3) + 13,
       date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
@@ -812,24 +819,24 @@ async function generateSampleData(storage: any) {
     finalUtilization: 32
   });
 
-  // Create sample PIPs
+  // Create sample PIPs (create for Emily who has inconsistent performance)
   const pipStartDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   const pipEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   
   await storage.createPip({
-    employeeId: "emp-003",
+    employeeId: "emp-004",
     startDate: pipStartDate,
     endDate: pipEndDate,
     gracePeriodDays: 21,
     goals: [
       "Achieve 75% average performance score",
-      "Complete 12+ tasks per week consistently", 
-      "Improve code quality and reduce bugs"
+      "Maintain consistent utilization above 70%", 
+      "Improve design quality and reduce revisions"
     ],
-    coachingPlan: "Weekly 1:1 sessions with technical mentoring and skill development focus",
-    initialScore: 58,
-    currentScore: 62,
-    progress: 35,
+    coachingPlan: "Weekly 1:1 sessions with design mentoring and process improvement focus",
+    initialScore: 68,
+    currentScore: 72,
+    progress: 45,
     improvementRequired: 15,
     status: "active"
   });
