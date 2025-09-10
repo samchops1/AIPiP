@@ -4,8 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { 
   Plus, 
   MessageSquare, 
@@ -17,8 +25,17 @@ import {
   Download
 } from "lucide-react";
 
+const createPipSchema = z.object({
+  employeeId: z.string().min(1, "Employee is required"),
+  gracePeriodDays: z.number().min(7, "Grace period must be at least 7 days").max(90, "Grace period cannot exceed 90 days"),
+  goals: z.string().min(10, "Goals must be at least 10 characters"),
+  coachingPlan: z.string().min(10, "Coaching plan must be at least 10 characters"),
+  improvementRequired: z.number().min(5, "Improvement required must be at least 5%").max(50, "Improvement required cannot exceed 50%")
+});
+
 export default function PipManagement() {
   const [selectedPip, setSelectedPip] = useState<any>(null);
+  const [showCreatePipModal, setShowCreatePipModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -89,6 +106,54 @@ export default function PipManagement() {
     }
   };
 
+  const createPipForm = useForm<z.infer<typeof createPipSchema>>({
+    resolver: zodResolver(createPipSchema),
+    defaultValues: {
+      employeeId: "",
+      gracePeriodDays: 21,
+      goals: "",
+      coachingPlan: "",
+      improvementRequired: 15
+    }
+  });
+
+  const createPipMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof createPipSchema>) => {
+      const startDate = new Date().toISOString().split('T')[0];
+      const endDate = new Date(Date.now() + data.gracePeriodDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      const pipData = {
+        ...data,
+        startDate,
+        endDate,
+        goals: data.goals.split('\n').filter(g => g.trim()),
+        status: 'active'
+      };
+
+      return apiRequest('/api/pips', { 
+        method: 'POST',
+        body: JSON.stringify(pipData),
+        headers: { 'Content-Type': 'application/json' }
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "PIP Created",
+        description: "Performance Improvement Plan has been created successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/pips'] });
+      setShowCreatePipModal(false);
+      createPipForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message || "Failed to create PIP",
+        variant: "destructive",
+      });
+    },
+  });
+
   const getEmployeeName = (employeeId: string) => {
     const employee = (employees as any[])?.find((e: any) => e.id === employeeId);
     return employee?.name || employeeId;
@@ -138,10 +203,138 @@ export default function PipManagement() {
               Monitor and manage Performance Improvement Plans
             </p>
           </div>
-          <Button data-testid="button-create-pip">
-            <Plus className="w-4 h-4 mr-2" />
-            Create New PIP
-          </Button>
+          <Dialog open={showCreatePipModal} onOpenChange={setShowCreatePipModal}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-create-pip">
+                <Plus className="w-4 h-4 mr-2" />
+                Create New PIP
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Create New Performance Improvement Plan</DialogTitle>
+              </DialogHeader>
+              <Form {...createPipForm}>
+                <form onSubmit={createPipForm.handleSubmit((data) => createPipMutation.mutate(data))} className="space-y-4">
+                  <FormField
+                    control={createPipForm.control}
+                    name="employeeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Employee</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-employee">
+                              <SelectValue placeholder="Select an employee" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {(employees as any[])?.filter(emp => emp.status === 'active').map((employee: any) => (
+                              <SelectItem key={employee.id} value={employee.id}>
+                                {employee.name} - {employee.role || 'N/A'}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={createPipForm.control}
+                      name="gracePeriodDays"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Grace Period (Days)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="7" 
+                              max="90"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value))}
+                              data-testid="input-grace-period"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={createPipForm.control}
+                      name="improvementRequired"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Required Improvement (%)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="5" 
+                              max="50"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                              data-testid="input-improvement-required"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={createPipForm.control}
+                    name="goals"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Goals (one per line)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter each goal on a new line..."
+                            className="min-h-[100px]"
+                            {...field}
+                            data-testid="textarea-goals"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={createPipForm.control}
+                    name="coachingPlan"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Coaching Plan</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Describe the coaching approach and schedule..."
+                            className="min-h-[80px]"
+                            {...field}
+                            data-testid="textarea-coaching-plan"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex justify-end space-x-2">
+                    <Button type="button" variant="outline" onClick={() => setShowCreatePipModal(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={createPipMutation.isPending} data-testid="button-submit-pip">
+                      {createPipMutation.isPending ? "Creating..." : "Create PIP"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
