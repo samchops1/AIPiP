@@ -990,11 +990,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: 'Employee not found' });
       }
 
-      const document = generatePipDocument(pip, employee);
+      // Generate PDF document
+      const pdfPath = await generatePIPPDF(pip, employee);
+      const filename = path.basename(pdfPath);
       
-      res.setHeader('Content-Type', 'text/plain');
-      res.setHeader('Content-Disposition', `attachment; filename="PIP_${employee.name.replace(/\s+/g, '_')}_${pip.id}.txt"`);
-      res.send(document);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      const fileStream = fs.createReadStream(pdfPath);
+      fileStream.pipe(res);
     } catch (error) {
       console.error('Error generating PIP document:', error);
       res.status(500).json({ error: 'Failed to generate PIP document' });
