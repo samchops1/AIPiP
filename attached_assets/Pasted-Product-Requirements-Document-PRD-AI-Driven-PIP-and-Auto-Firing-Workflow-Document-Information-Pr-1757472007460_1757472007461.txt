@@ -1,0 +1,234 @@
+Product Requirements Document (PRD): AI-Driven PIP and Auto-Firing Workflow
+Document Information
+
+Product Name: AI Talent PIP & Auto-Firing System (PIP-AutoFire)
+Version: 1.0
+Author: Sameer Chopra (Candidate for SVP AI Talent Systems Architecture at Trilogy/ESW Capital)
+Date: September 09, 2025
+Purpose: This PRD outlines a low-code AI workflow for automating Performance Improvement Plans (PIPs) and terminations in a manager-less environment, addressing gaps in production-grade robustness, ethical guardrails, and scalability. Designed for demonstration in Replit (Python-based IDE), using available libraries (e.g., pandas for data handling, no external installs). This prototype simulates employee performance tracking, PIP triggers, coaching, and auto-firing, with human-in-the-loop (HITL) options for compliance.
+
+Overview
+The PIP-AutoFire system is an AI-native tool for high-autonomy talent management, enabling objective, data-driven decisions without traditional managers. It processes employee metrics (e.g., call scores, task completion) to trigger PIPs, provide automated coaching, monitor progress, and escalate to termination if thresholds aren't met. This aligns with Trilogy/ESW's AI-first playbook for scaling 80-1000+ remote teams across portfolios, reducing headcount reliance while ensuring legal/ethical compliance (e.g., audits, appeals).
+Key Features:
+
+Automated threshold-based PIP initiation.
+GenAI coaching feedback (simulated via rule-based logic; extensible to LLMs).
+Progress tracking with grace periods (e.g., 3 weeks).
+Auto-firing with documentation (e.g., termination letter generation).
+Reliability: Kill-switches, rollbacks, and audits to address eval concerns.
+
+Assumptions:
+
+Input data: CSV of employee metrics (e.g., scores, timestamps).
+Output: Logs, dashboards (text-based in Replit), and actions (e.g., email simulations).
+Scope: Prototype for demo; production would integrate with HR tools (e.g., Paylocity, Azure AD).
+
+Goals and Success Metrics
+
+Business Goals:
+
+Reduce manual HR intervention by 80% (e.g., auto-generate PIPs/coaching).
+Ensure compliance: 100% audit trail for terminations, <5% false positives via thresholds.
+Scale to 1000+ employees: Process 1000 records in <5 min.
+
+
+Success Metrics:
+
+ROI: Simulate 40% ticket reduction (like your Avanti bots).
+Accuracy: 95% match between AI decisions and manual rubrics.
+User Adoption: Ethical HITL for appeals (e.g., 10% override rate).
+Demo KPIs: Run end-to-end in Replit without errors; show rollback for a mis-trigger.
+
+
+
+Stakeholders
+
+Primary Users: HR/Talent Leads (e.g., Trilogy admins) – Input data, review escalations.
+End Users: Employees – Receive coaching/PIP notifications (simulated).
+Admins: Portfolio CEOs (e.g., Danielle Rios Royston) – Monitor dashboards, kill-switches.
+Internal: AI Architects (you) – Build/maintain; integrates with Crossover for sourcing.
+
+Requirements
+Functional Requirements
+
+Data Ingestion: Load employee data (ID, metrics like score, tasks_completed, date) from CSV. Simulate real-time feeds (e.g., call transcripts).
+Performance Threshold Check: AI evaluates metrics against rubric (e.g., score <70% for 3 consecutive periods triggers PIP).
+PIP Generation: Auto-create PIP document (template with goals, timeline, coaching plan). Send simulated notification.
+Coaching Module: Generate personalized feedback (rule-based: "Improve tone in calls" if sentiment low). Track progress over grace period (e.g., 21 days).
+Escalation to Termination: If no improvement (e.g., <10% uplift), auto-generate termination letter with audit log. Include HITL appeal step.
+Dashboard: Text-based output showing employee status, trends, and actions (e.g., pandas table).
+Guardrails: Kill-switch to pause workflow; rollback for errors (e.g., revert assignments).
+
+Non-Functional Requirements
+
+Performance: Handle 1000+ records; <1s per evaluation.
+Security/Compliance: Log all actions (timestamps, decisions); encrypt sensitive data (simulated). Ethical: Bias checks (e.g., diverse thresholds); human override for terminations.
+Reliability: Error handling (e.g., invalid data → alert); 99% uptime simulation.
+Scalability: Modular for portfolio integration (e.g., API endpoints for ESW tools).
+Tech Stack: Python in Replit (pandas for data, datetime for tracking; no installs—use built-ins for simulations).
+
+User Stories
+
+As an HR Lead, I want to upload a CSV so the system evaluates performance and flags PIP candidates.
+As an Employee, I want automated coaching emails with actionable steps to improve during PIP.
+As an Admin, I want a dashboard to review/override decisions and simulate terminations.
+As an Architect, I want a kill-switch to halt workflows during incidents.
+
+Technical Implementation Plan
+
+Platform: Replit (free tier sufficient; Python repl). Fork a new repl from Python template.
+Dependencies: Use Replit's defaults—no pip needed. Libraries: pandas (for data), datetime (for timestamps), json (for logs).
+Architecture:
+
+Input: CSV upload (simulate employee data).
+Core Logic: Pandas DataFrame for metrics; functions for threshold check, PIP gen, coaching, escalation.
+Output: Print dashboard/logs; simulate emails (print statements).
+Guardrails: Try-except for errors; manual flag for kill-switch.
+
+
+Development Steps in Replit:
+
+Create new Python repl.
+Upload sample CSV (code below generates it).
+Run main script to demo workflow.
+Test: Input low scores → PIP → no improvement → fire; toggle kill-switch.
+
+
+
+Sample Code for Replit Demo
+Copy-paste this into a Replit Python file (main.py). It simulates the full workflow: Generates sample data, checks thresholds, creates PIP, coaches, escalates to fire. Run with python main.py. Outputs dashboard/logs.
+pythonimport pandas as pd
+from datetime import datetime, timedelta
+import json
+import sys
+
+# Sample Data Generation (Simulate employee metrics CSV)
+def generate_sample_data(num_employees=5):
+    data = []
+    for i in range(1, num_employees + 1):
+        # Simulate 4 periods of scores (e.g., call scores 0-100)
+        scores = [85, 78, 65, 55] if i == 1 else [90, 92, 88, 89]  # Employee 1 low for PIP trigger
+        for period, score in enumerate(scores, 1):
+            data.append({
+                'employee_id': f'E{i:03d}',
+                'period': period,
+                'score': score,
+                'tasks_completed': 10 if score > 70 else 5,
+                'date': (datetime.now() - timedelta(weeks=4-period)).strftime('%Y-%m-%d')
+            })
+    df = pd.DataFrame(data)
+    df.to_csv('employee_metrics.csv', index=False)
+    return df
+
+# Threshold Check Function
+def check_threshold(df, min_score=70, consecutive_low=3):
+    recent = df[df['period'] >= df['period'].max() - consecutive_low + 1]
+    low_performers = recent[recent['score'] < min_score].groupby('employee_id')['score'].count()
+    pip_candidates = low_performers[low_performers >= consecutive_low].index.tolist()
+    return pip_candidates
+
+# PIP Generation (Simulated Document)
+def generate_pip(employee_id, df, grace_days=21):
+    pip = {
+        'employee_id': employee_id,
+        'start_date': datetime.now().strftime('%Y-%m-%d'),
+        'grace_period': grace_days,
+        'goals': ['Achieve 80% average score', f'Complete {grace_days} tasks'],
+        'coaching_plan': 'Weekly feedback on tone and rubric adherence'
+    }
+    log = {'action': 'PIP Generated', 'details': pip, 'timestamp': datetime.now().isoformat()}
+    with open('pip_log.json', 'a') as f:
+        json.dump(log, f)
+        f.write('\n')
+    return pip
+
+# Coaching Module (Rule-Based Feedback)
+def provide_coaching(employee_id, score):
+    if score < 60:
+        feedback = "Focus on tone and inflection—review rubric for sentiment."
+    elif score < 70:
+        feedback = "Increase tasks completed; aim for 80% threshold."
+    else:
+        feedback = "Good progress—maintain rubric adherence."
+    return {'employee_id': employee_id, 'feedback': feedback, 'date': datetime.now().strftime('%Y-%m-%d')}
+
+# Progress Check & Auto-Firing
+def check_pip_progress(employee_id, df, pip_start, grace_days, min_improvement=10):
+    end_date = pip_start + timedelta(days=grace_days)
+    progress_df = df[(df['employee_id'] == employee_id) & (df['date'] > pip_start.strftime('%Y-%m-%d'))]
+    if progress_df.empty:
+        return False  # No data during grace
+    avg_pre = df[df['employee_id'] == employee_id]['score'].mean()  # Pre-PIP avg
+    avg_post = progress_df['score'].mean()
+    improvement = ((avg_post - avg_pre) / avg_pre) * 100 if avg_pre > 0 else 0
+    if improvement < min_improvement or avg_post < 70:
+        # Auto-Fire Simulation
+        termination = {
+            'employee_id': employee_id,
+            'reason': f'No {min_improvement}% improvement; avg post-PIP: {avg_post:.2f}',
+            'date': end_date.strftime('%Y-%m-%d'),
+            'letter': f'Dear {employee_id}, your performance did not meet PIP goals. Termination effective {end_date.strftime("%Y-%m-%d")}. Audit log attached.'
+        }
+        log = {'action': 'Termination', 'details': termination, 'timestamp': end_date.isoformat()}
+        with open('termination_log.json', 'a') as f:
+            json.dump(log, f)
+            f.write('\n')
+        return True  # Fired
+    return False  # Improved
+
+# Kill-Switch (Global Flag for Reliability)
+KILL_SWITCH = False  # Toggle to True for rollback/pause
+
+def main():
+    if KILL_SWITCH:
+        print("Kill-switch activated: Workflow paused.")
+        return
+    
+    # Step 1: Generate/Load Data
+    df = generate_sample_data()
+    print("Sample Data Generated (employee_metrics.csv):")
+    print(df.head())
+    
+    # Step 2: Threshold Check
+    candidates = check_threshold(df)
+    print(f"\nPIP Candidates: {candidates}")
+    
+    # Step 3: Generate PIP for Candidate
+    if candidates:
+        pip = generate_pip(candidates[0], df)
+        print(f"\nPIP Generated for {pip['employee_id']}: {pip}")
+        
+        # Simulate Grace Period Progress (Add dummy post-PIP data)
+        new_row = {'employee_id': pip['employee_id'], 'period': df['period'].max() + 1, 'score': 60, 'tasks_completed': 6, 'date': (datetime.now() + timedelta(days=21)).strftime('%Y-%m-%d')}
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+        
+        # Step 4: Coaching
+        feedback = provide_coaching(pip['employee_id'], new_row['score'])
+        print(f"\nCoaching Feedback: {feedback}")
+        
+        # Step 5: Check Progress & Auto-Fire
+        fired = check_pip_progress(pip['employee_id'], df, datetime.now(), 21)
+        if fired:
+            print("\nAuto-Firing Triggered: Check termination_log.json")
+        else:
+            print("\nImprovement Detected: PIP Successful.")
+    
+    # Step 6: Dashboard (Simple Text Table)
+    print("\nPerformance Dashboard:")
+    summary = df.groupby('employee_id').agg({'score': ['mean', 'min'], 'tasks_completed': 'sum'}).round(2)
+    print(summary)
+
+if __name__ == "__main__":
+    main()
+Demo Steps in Replit
+
+Setup: Go to replit.com, create new Python repl, paste code into main.py.
+Run: Click "Run" – generates CSV, simulates workflow (PIP for low performer, coaching, firing if no improvement).
+Test Scenarios:
+
+Toggle KILL_SWITCH = True → Pauses, demos rollback.
+Edit sample data (e.g., higher scores) → No PIP/fire.
+View Logs: Open pip_log.json/termination_log.json in Replit file explorer.
+
+
+Customization for Interview: Add HITL input (e.g., input("Override?")) for appeals. Extend with LLM simulation (print-based). Runtime: <10s for 1000 rows (scale df).
