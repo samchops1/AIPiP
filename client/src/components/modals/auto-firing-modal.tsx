@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { User, AlertTriangle, FileText, CheckCircle, XCircle } from "lucide-react";
+import { User, AlertTriangle, FileText, CheckCircle, XCircle, Download } from "lucide-react";
 
 interface AutoFiringModalProps {
   isOpen: boolean;
@@ -24,6 +24,21 @@ export default function AutoFiringModal({
   onClose, 
   employees 
 }: AutoFiringModalProps) {
+  
+  const downloadTerminationLetter = (employee: any) => {
+    if (!employee.terminationLetter) return;
+    
+    const content = employee.terminationLetter;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Termination_Letter_${employee.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
   const [currentStep, setCurrentStep] = useState(0);
   const [currentEmployeeIndex, setCurrentEmployeeIndex] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -33,7 +48,6 @@ export default function AutoFiringModal({
     "Scanning employee performance history...",
     "Evaluating termination criteria...",
     "Processing terminations...",
-    "Generating termination documentation...",
     "Auto-firing process complete!"
   ];
 
@@ -50,17 +64,17 @@ export default function AutoFiringModal({
             const newProgress = ((prev + 1) / steps.length) * 100;
             setProgress(newProgress);
             
-            // Show employee processing animation during step 2
-            if (prev === 2 && employees.length > 0) {
+            // Show employee processing animation during step 1 (evaluating)
+            if (prev === 1 && employees.length > 0) {
               setTimeout(() => {
                 setCurrentEmployeeIndex(prevIndex => 
                   prevIndex < employees.length - 1 ? prevIndex + 1 : prevIndex
                 );
-              }, 600);
+              }, 400);
             }
             
-            if (prev === steps.length - 2) {
-              setTimeout(() => setShowResults(true), 500);
+            if (prev === steps.length - 1) {
+              setTimeout(() => setShowResults(true), 300);
             }
             
             return prev + 1;
@@ -68,7 +82,7 @@ export default function AutoFiringModal({
           clearInterval(timer);
           return prev;
         });
-      }, 1500);
+      }, 1200);
 
       return () => clearInterval(timer);
     }
@@ -138,7 +152,7 @@ export default function AutoFiringModal({
           </div>
 
           {/* Employee Processing Animation */}
-          {currentStep === 2 && employees.length > 0 && (
+          {(currentStep === 1 || currentStep === 2) && employees.length > 0 && (
             <div className="space-y-3 animate-in fade-in-50 slide-in-from-bottom-5 duration-300">
               <h4 className="text-sm font-medium">Processing Employees:</h4>
               <div className="space-y-2 max-h-40 overflow-y-auto">
@@ -204,9 +218,21 @@ export default function AutoFiringModal({
                             
                             {employee.terminationLetter && (
                               <div className="mt-3 bg-muted/50 rounded p-3 border">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <FileText className="w-4 h-4 text-muted-foreground" />
-                                  <span className="text-sm font-medium">Termination Letter</span>
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center space-x-2">
+                                    <FileText className="w-4 h-4 text-muted-foreground" />
+                                    <span className="text-sm font-medium">Termination Letter</span>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => downloadTerminationLetter(employee)}
+                                    className="h-7 px-2 text-xs"
+                                    data-testid={`button-download-letter-${employee.id}`}
+                                  >
+                                    <Download className="w-3 h-3 mr-1" />
+                                    Download
+                                  </Button>
                                 </div>
                                 <div className="text-xs bg-white/50 rounded border p-2 max-h-32 overflow-y-auto">
                                   <pre className="whitespace-pre-wrap text-xs">{employee.terminationLetter}</pre>
@@ -219,7 +245,7 @@ export default function AutoFiringModal({
                     </div>
                     
                     <div className="text-xs text-muted-foreground bg-accent/10 border border-accent/20 p-3 rounded">
-                      📄 Termination letters have been automatically generated with current date, performance data and specific reasons. All actions have been logged for audit compliance.
+                      📄 Termination letters have been automatically generated with current date, performance data and specific reasons. Click "Download" to save individual letters as text files. All actions have been logged for audit compliance.
                     </div>
                   </div>
                 ) : (

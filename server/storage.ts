@@ -97,6 +97,7 @@ export class MemStorage implements IStorage {
       email: insertEmployee.email || null,
       department: insertEmployee.department || null,
       managerId: insertEmployee.managerId || null,
+      status: insertEmployee.status || "active",
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -174,9 +175,11 @@ export class MemStorage implements IStorage {
     const pip: Pip = {
       ...insertPip,
       id,
+      status: insertPip.status || "active",
       progress: insertPip.progress || 0,
       initialScore: insertPip.initialScore || null,
       currentScore: insertPip.currentScore || null,
+      improvementRequired: insertPip.improvementRequired || 0,
       createdAt: new Date()
     };
     this.pips.set(id, pip);
