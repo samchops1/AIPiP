@@ -1,0 +1,35 @@
+[vite] connecting...
+[vite] connected.
+Warning: validateDOMNesting(...): <a> cannot appear as a descendant of &lt;a&gt;.
+    at a
+    at a
+    at https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=9018737c:337:18
+    at li
+    at ul
+    at nav
+    at aside
+    at Sidebar (https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/src/components/layout/sidebar.tsx:41:22)
+    at div
+    at Router
+    at Provider (https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-PLT6GTVM.js?v=9018737c:38:15)
+    at TooltipProvider (https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=9018737c:58:5)
+    at QueryClientProvider (https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=9018737c:2805:3)
+    at App
+at a
+at a
+at https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=9018737c:337:18
+at li
+at ul
+at nav
+at aside
+at Sidebar (https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/src/components/layout/sidebar.tsx:41:22)
+at div
+at Router
+at Provider (https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-PLT6GTVM.js?v=9018737c:38:15)
+at TooltipProvider (https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=9018737c:58:5)
+at QueryClientProvider (https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=9018737c:2805:3)
+at App
+at t.value (https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://9053797b-034d-4a48-bc2d-bd36b1f4fe26-00-1mntp3dnw0la.spock.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400

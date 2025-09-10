@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { User, AlertTriangle, FileText, CheckCircle, XCircle, Download } from "lucide-react";
+// @ts-ignore
+import jsPDF from 'jspdf';
 
 interface AutoFiringModalProps {
   isOpen: boolean;
@@ -28,16 +30,36 @@ export default function AutoFiringModal({
   const downloadTerminationLetter = (employee: any) => {
     if (!employee.terminationLetter) return;
     
-    const content = employee.terminationLetter;
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Termination_Letter_${employee.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    try {
+      const doc = new jsPDF();
+      const content = employee.terminationLetter;
+      
+      // Set title
+      doc.setFontSize(16);
+      doc.text('TERMINATION LETTER', 20, 20);
+      
+      // Set content
+      doc.setFontSize(11);
+      const lines = doc.splitTextToSize(content, 170);
+      doc.text(lines, 20, 40);
+      
+      // Download the PDF
+      const fileName = `Termination_Letter_${employee.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+    } catch (error) {
+      console.error('PDF generation failed, falling back to text:', error);
+      // Fallback to text file
+      const content = employee.terminationLetter;
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Termination_Letter_${employee.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
   };
   const [currentStep, setCurrentStep] = useState(0);
   const [currentEmployeeIndex, setCurrentEmployeeIndex] = useState(0);
@@ -58,31 +80,28 @@ export default function AutoFiringModal({
       setProgress(0);
       setShowResults(false);
       
+      let stepIndex = 0;
       const timer = setInterval(() => {
-        setCurrentStep(prev => {
-          if (prev < steps.length - 1) {
-            const newProgress = ((prev + 1) / steps.length) * 100;
-            setProgress(newProgress);
-            
-            // Show employee processing animation during step 1 (evaluating)
-            if (prev === 1 && employees.length > 0) {
-              setTimeout(() => {
-                setCurrentEmployeeIndex(prevIndex => 
-                  prevIndex < employees.length - 1 ? prevIndex + 1 : prevIndex
-                );
-              }, 400);
-            }
-            
-            if (prev === steps.length - 1) {
-              setTimeout(() => setShowResults(true), 300);
-            }
-            
-            return prev + 1;
-          }
+        stepIndex++;
+        setCurrentStep(stepIndex);
+        setProgress((stepIndex / steps.length) * 100);
+        
+        // Show employee processing animation during step 1 (evaluating)
+        if (stepIndex === 1 && employees.length > 0) {
+          setTimeout(() => {
+            setCurrentEmployeeIndex(prevIndex => 
+              prevIndex < employees.length - 1 ? prevIndex + 1 : prevIndex
+            );
+          }, 400);
+        }
+        
+        // Show results when we complete all steps
+        if (stepIndex >= steps.length) {
           clearInterval(timer);
-          return prev;
-        });
-      }, 1200);
+          setProgress(100);
+          setShowResults(true);
+        }
+      }, 1000);
 
       return () => clearInterval(timer);
     }
@@ -245,7 +264,7 @@ export default function AutoFiringModal({
                     </div>
                     
                     <div className="text-xs text-muted-foreground bg-accent/10 border border-accent/20 p-3 rounded">
-                      📄 Termination letters have been automatically generated with current date, performance data and specific reasons. Click "Download" to save individual letters as text files. All actions have been logged for audit compliance.
+                      📄 Termination letters have been automatically generated with current date, performance data and specific reasons. Click "Download" to save individual letters as PDF files. All actions have been logged for audit compliance.
                     </div>
                   </div>
                 ) : (
