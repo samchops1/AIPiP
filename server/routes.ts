@@ -390,6 +390,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PIP document generation endpoint
+  app.get('/api/pips/:id/document', async (req, res) => {
+    try {
+      const pip = await storage.getPipById(req.params.id);
+      if (!pip) {
+        return res.status(404).json({ error: 'PIP not found' });
+      }
+
+      const employee = await storage.getEmployee(pip.employeeId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+
+      const document = generatePipDocument(pip, employee);
+      
+      res.setHeader('Content-Type', 'text/plain');
+      res.setHeader('Content-Disposition', `attachment; filename="PIP_${employee.name.replace(/\s+/g, '_')}_${pip.id}.txt"`);
+      res.send(document);
+    } catch (error) {
+      console.error('Error generating PIP document:', error);
+      res.status(500).json({ error: 'Failed to generate PIP document' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
@@ -738,4 +762,80 @@ async function evaluateTerminationCandidates() {
   }
 
   return { results, processed: pips.length };
+}
+
+function generatePipDocument(pip: any, employee: any): string {
+  const document = `
+PERFORMANCE IMPROVEMENT PLAN (PIP)
+
+Employee Information:
+------------------
+Name: ${employee.name}
+Employee ID: ${employee.id}
+Role: ${employee.role || 'N/A'}
+Department: ${employee.department || 'N/A'}
+Email: ${employee.email || 'N/A'}
+
+PIP Details:
+-----------
+PIP ID: ${pip.id}
+Start Date: ${pip.startDate}
+End Date: ${pip.endDate}
+Grace Period: ${pip.gracePeriodDays} days
+Status: ${pip.status}
+
+Performance Overview:
+--------------------
+Initial Score: ${pip.initialScore || 'N/A'}%
+Current Score: ${pip.currentScore || 'N/A'}%
+Required Improvement: ${pip.improvementRequired || 'N/A'}%
+Current Progress: ${pip.progress || 0}%
+
+Goals and Objectives:
+--------------------
+${pip.goals.map((goal: string, index: number) => `${index + 1}. ${goal}`).join('\n')}
+
+Coaching Plan:
+--------------
+${pip.coachingPlan}
+
+Progress Tracking:
+-----------------
+- Weekly performance reviews and feedback sessions
+- Bi-weekly progress assessments
+- Monthly goal evaluation and adjustment
+- Regular coaching sessions with designated mentor
+
+Expected Outcomes:
+-----------------
+By the end of this PIP period, the employee is expected to:
+- Achieve a consistent performance score of ${(pip.initialScore || 70) + (pip.improvementRequired || 15)}% or higher
+- Demonstrate sustained improvement in key performance areas
+- Successfully complete all assigned goals and objectives
+- Show commitment to ongoing professional development
+
+Next Steps:
+-----------
+1. Employee acknowledgment and signature required
+2. Schedule initial coaching session within 48 hours
+3. Set up weekly check-in meetings
+4. Begin performance monitoring and documentation
+5. Provide necessary resources and training
+
+Important Notes:
+---------------
+- This PIP is designed to support employee success and improvement
+- Failure to meet the requirements may result in further disciplinary action
+- All progress will be documented and reviewed regularly
+- Employee support resources are available throughout the process
+
+Generated on: ${new Date().toLocaleString()}
+System: AI Talent PIP & Auto-Firing System
+
+---
+This document serves as an official Performance Improvement Plan.
+Please review carefully and discuss any questions with your supervisor.
+`;
+
+  return document.trim();
 }

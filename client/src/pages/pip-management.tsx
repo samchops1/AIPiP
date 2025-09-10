@@ -13,7 +13,8 @@ import {
   TrendingUp, 
   AlertTriangle,
   User,
-  Target
+  Target,
+  Download
 } from "lucide-react";
 
 export default function PipManagement() {
@@ -58,6 +59,35 @@ export default function PipManagement() {
       });
     },
   });
+
+  const downloadPipDocument = async (pipId: string, employeeName: string) => {
+    try {
+      const response = await fetch(`/api/pips/${pipId}/document`);
+      if (!response.ok) throw new Error('Failed to download document');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `PIP_${employeeName.replace(/\s+/g, '_')}_${pipId}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Document Downloaded",
+        description: "PIP document has been downloaded successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Download Failed",
+        description: "Failed to download PIP document",
+        variant: "destructive",
+      });
+    }
+  };
 
   const getEmployeeName = (employeeId: string) => {
     const employee = (employees as any[])?.find((e: any) => e.id === employeeId);
@@ -218,6 +248,14 @@ export default function PipManagement() {
                       data-testid={`button-view-details-${pip.id}`}
                     >
                       View Details
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => downloadPipDocument(pip.id, getEmployeeName(pip.employeeId))}
+                      data-testid={`button-download-${pip.id}`}
+                    >
+                      <Download className="w-4 h-4" />
                     </Button>
                     <Button 
                       size="sm" 

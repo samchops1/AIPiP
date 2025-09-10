@@ -156,6 +156,10 @@ export class MemStorage implements IStorage {
       .filter(pip => pip.status === "active");
   }
 
+  async getPipById(id: string): Promise<Pip | undefined> {
+    return this.pips.get(id);
+  }
+
   async createPip(insertPip: InsertPip): Promise<Pip> {
     const id = randomUUID();
     const pip: Pip = {

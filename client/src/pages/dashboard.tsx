@@ -1,13 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import MetricsCards from "@/components/dashboard/metrics-cards";
 import EmployeeTable from "@/components/dashboard/employee-table";
 import RecentActions from "@/components/dashboard/recent-actions";
 import PipCards from "@/components/dashboard/pip-cards";
 import { Button } from "@/components/ui/button";
-import { Upload, FileText } from "lucide-react";
+import { Upload, FileText, Database, Trash2 } from "lucide-react";
 import { Link } from "wouter";
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Dashboard() {
+  const { toast } = useToast();
+
   const { data: dashboardMetrics, isLoading: metricsLoading } = useQuery({
     queryKey: ['/api/dashboard-metrics'],
   });
@@ -27,6 +31,46 @@ export default function Dashboard() {
 
   const { data: auditLogs } = useQuery({
     queryKey: ['/api/audit-logs'],
+  });
+
+  const generateSampleDataMutation = useMutation({
+    mutationFn: () => apiRequest('/api/sample-data/generate', { method: 'POST' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/performance-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/pips'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/audit-logs'] });
+      toast({
+        title: 'Sample data generated',
+        description: 'Created 6 employees with realistic performance patterns'
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to generate sample data',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const clearDataMutation = useMutation({
+    mutationFn: () => apiRequest('/api/sample-data/clear', { method: 'POST' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast({
+        title: 'Data cleared',
+        description: 'All sample data has been removed'
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to clear data',
+        variant: 'destructive'
+      });
+    }
   });
 
   return (
@@ -50,6 +94,45 @@ export default function Dashboard() {
         <div className="space-y-6">
           <RecentActions auditLogs={auditLogs as any[]} />
           
+          {/* Sample Data Widget */}
+          <div className="bg-card rounded-lg border border-border">
+            <div className="p-4 border-b border-border">
+              <h3 className="font-semibold">Sample Data</h3>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="text-center">
+                <Database className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground mb-3">
+                  Generate realistic demo data to explore the system
+                </p>
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    size="sm" 
+                    onClick={() => generateSampleDataMutation.mutate()}
+                    disabled={generateSampleDataMutation.isPending}
+                    data-testid="button-generate-sample"
+                  >
+                    <Database className="w-4 h-4 mr-2" />
+                    Generate Sample Data
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => clearDataMutation.mutate()}
+                    disabled={clearDataMutation.isPending}
+                    data-testid="button-clear-data"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Clear All Data
+                  </Button>
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Includes: 6 employees, performance metrics, active PIPs, coaching sessions
+              </div>
+            </div>
+          </div>
+
           {/* Quick Data Upload Widget */}
           <div className="bg-card rounded-lg border border-border">
             <div className="p-4 border-b border-border">
