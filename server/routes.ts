@@ -358,6 +358,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate sample data
+  // Terminated employees routes
+  app.get("/api/terminated-employees", async (req, res) => {
+    try {
+      const terminatedEmployees = await storage.getTerminatedEmployees();
+      res.json(terminatedEmployees);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch terminated employees" });
+    }
+  });
+
+  // Auto-firing demonstration endpoint
+  app.post("/api/auto-fire/demo", async (req, res) => {
+    try {
+      const settings = await storage.getSystemSettings();
+      
+      if (settings.killSwitchActive) {
+        return res.json({ 
+          message: "Kill switch is active. Auto-firing is disabled.",
+          terminated: []
+        });
+      }
+
+      const employees = await storage.getAllEmployees();
+      const metrics = await storage.getAllPerformanceMetrics();
+      const terminated = [];
+
+      // Find employees with consistently poor performance AND utilization
+      for (const employee of employees) {
+        if (employee.status !== 'active') continue;
+
+        const employeeMetrics = metrics
+          .filter(m => m.employeeId === employee.id)
+          .sort((a, b) => b.period - a.period)
+          .slice(0, settings.consecutiveLowPeriods);
+
+        if (employeeMetrics.length >= settings.consecutiveLowPeriods) {
+          const allLowPerformance = employeeMetrics.every(m => 
+            m.score < settings.minScoreThreshold && 
+            m.utilization < settings.minUtilizationThreshold
+          );
+
+          if (allLowPerformance) {
+            const latestMetric = employeeMetrics[0];
+            const reasons = [
+              `Consistently scored below ${settings.minScoreThreshold}% for ${settings.consecutiveLowPeriods} consecutive periods`,
+              `Utilization consistently below ${settings.minUtilizationThreshold}% vs company standard`,
+              "Failed to meet minimum performance standards despite coaching opportunities",
+              `Average score: ${Math.round(employeeMetrics.reduce((sum, m) => sum + m.score, 0) / employeeMetrics.length)}%`,
+              `Average utilization: ${Math.round(employeeMetrics.reduce((sum, m) => sum + m.utilization, 0) / employeeMetrics.length)}%`
+            ];
+
+            // Update employee status
+            await storage.updateEmployee(employee.id, { status: "terminated" });
+
+            // Create termination record
+            await storage.createTerminatedEmployee({
+              employeeId: employee.id,
+              employeeName: employee.name,
+              terminationDate: new Date().toISOString().split('T')[0],
+              terminationReason: "Consistent poor performance and utilization below company standards",
+              terminationLetter: generateTerminationLetter(
+                employee.name,
+                employee.role || "Employee",
+                latestMetric.score,
+                latestMetric.utilization,
+                reasons
+              ),
+              finalScore: latestMetric.score,
+              finalUtilization: latestMetric.utilization
+            });
+
+            // Create audit log
+            await storage.createAuditLog({
+              action: "employee_auto_terminated",
+              entityType: "employee",
+              entityId: employee.id,
+              details: {
+                reason: "Auto-firing due to consecutive poor performance and utilization",
+                finalScore: latestMetric.score,
+                finalUtilization: latestMetric.utilization,
+                periodsEvaluated: settings.consecutiveLowPeriods
+              }
+            });
+
+            terminated.push({
+              id: employee.id,
+              name: employee.name,
+              role: employee.role,
+              finalScore: latestMetric.score,
+              finalUtilization: latestMetric.utilization,
+              reason: "Consecutive poor performance and low utilization"
+            });
+          }
+        }
+      }
+
+      res.json({
+        message: terminated.length > 0 
+          ? `Auto-firing completed. ${terminated.length} employee(s) terminated.`
+          : "No employees met termination criteria.",
+        terminated
+      });
+    } catch (error) {
+      console.error('Error in auto-firing:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   app.post('/api/sample-data/generate', async (req, res) => {
     try {
       await generateSampleData(storage);
