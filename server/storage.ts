@@ -9,6 +9,8 @@ import {
   type InsertCoachingSession,
   type AuditLog,
   type InsertAuditLog,
+  type TerminatedEmployee,
+  type InsertTerminatedEmployee,
   type SystemSettings,
   type UpdateSystemSettings
 } from "@shared/schema";
@@ -42,6 +44,10 @@ export interface IStorage {
   getAuditLogs(): Promise<AuditLog[]>;
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   
+  // Terminated Employees
+  getTerminatedEmployees(): Promise<TerminatedEmployee[]>;
+  createTerminatedEmployee(employee: InsertTerminatedEmployee): Promise<TerminatedEmployee>;
+  
   // System Settings
   getSystemSettings(): Promise<SystemSettings>;
   updateSystemSettings(updates: UpdateSystemSettings): Promise<SystemSettings>;
@@ -53,6 +59,7 @@ export class MemStorage implements IStorage {
   private pips: Map<string, Pip>;
   private coachingSessions: Map<string, CoachingSession>;
   private auditLogs: Map<string, AuditLog>;
+  private terminatedEmployees: Map<string, TerminatedEmployee>;
   private systemSettings: SystemSettings;
 
   constructor() {
@@ -61,10 +68,12 @@ export class MemStorage implements IStorage {
     this.pips = new Map();
     this.coachingSessions = new Map();
     this.auditLogs = new Map();
+    this.terminatedEmployees = new Map();
     this.systemSettings = {
       id: "system",
       killSwitchActive: false,
       minScoreThreshold: 70,
+      minUtilizationThreshold: 60,
       consecutiveLowPeriods: 3,
       defaultGracePeriod: 21,
       minImprovementPercent: 10,
@@ -219,6 +228,25 @@ export class MemStorage implements IStorage {
     };
     this.auditLogs.set(id, log);
     return log;
+  }
+
+  // Terminated Employees
+  async getTerminatedEmployees(): Promise<TerminatedEmployee[]> {
+    return Array.from(this.terminatedEmployees.values())
+      .sort((a, b) => new Date(b.terminationDate).getTime() - new Date(a.terminationDate).getTime());
+  }
+
+  async createTerminatedEmployee(insertEmployee: InsertTerminatedEmployee): Promise<TerminatedEmployee> {
+    const id = randomUUID();
+    const employee: TerminatedEmployee = {
+      ...insertEmployee,
+      id,
+      finalScore: insertEmployee.finalScore || null,
+      finalUtilization: insertEmployee.finalUtilization || null,
+      createdAt: new Date()
+    };
+    this.terminatedEmployees.set(id, employee);
+    return employee;
   }
 
   // System Settings
