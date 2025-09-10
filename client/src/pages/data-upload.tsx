@@ -5,12 +5,25 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import CsvUploader from "@/components/upload/csv-uploader";
 import { apiRequest } from "@/lib/queryClient";
-import { Upload, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import { Upload, FileText, CheckCircle, AlertCircle, Download } from "lucide-react";
 
 export default function DataUpload() {
   const [uploadResults, setUploadResults] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const handleDownloadSample = async () => {
+    const response = await fetch("/api/sample-csv");
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "sample.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
 
   const uploadMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -54,11 +67,20 @@ export default function DataUpload() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <CsvUploader 
+            <CsvUploader
               onUpload={(data) => uploadMutation.mutate({ data })}
               isLoading={uploadMutation.isPending}
             />
-            
+
+            <Button
+              variant="outline"
+              onClick={handleDownloadSample}
+              className="mt-4"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download Sample CSV
+            </Button>
+
             <div className="mt-4 p-3 bg-muted rounded-lg">
               <h4 className="text-sm font-medium mb-2">Required CSV Format:</h4>
               <div className="text-xs text-muted-foreground space-y-1">
