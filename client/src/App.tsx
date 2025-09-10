@@ -9,6 +9,7 @@ import PipManagement from "@/pages/pip-management";
 import CoachingSystem from "@/pages/coaching-system";
 import AuditLogs from "@/pages/audit-logs";
 import Settings from "@/pages/settings";
+import EmployeeDetails from "@/pages/employee-details";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -26,6 +27,7 @@ function Router() {
           <Route path="/coaching" component={CoachingSystem} />
           <Route path="/audit" component={AuditLogs} />
           <Route path="/settings" component={Settings} />
+          <Route path="/employee/:id" component={EmployeeDetails} />
           <Route component={NotFound} />
         </Switch>
       </main>

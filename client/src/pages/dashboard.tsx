@@ -194,15 +194,15 @@ export default function Dashboard() {
             <div className="p-4 border-b border-border">
               <h3 className="font-semibold flex items-center">
                 <Users className="w-4 h-4 mr-2 text-red-500" />
-                Terminated Employees ({terminatedEmployees?.length || 0})
+                Terminated Employees ({(terminatedEmployees as any[])?.length || 0})
               </h3>
             </div>
             <div className="p-4 space-y-3">
               {terminatedLoading ? (
                 <div className="text-sm text-muted-foreground">Loading...</div>
-              ) : terminatedEmployees?.length > 0 ? (
+              ) : (terminatedEmployees as any[])?.length > 0 ? (
                 <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {terminatedEmployees.map((emp: any) => (
+                  {(terminatedEmployees as any[]).map((emp: any) => (
                     <div key={emp.id} className="p-2 bg-red-50 dark:bg-red-950/20 rounded border border-red-200 dark:border-red-800">
                       <div className="text-sm font-medium">{emp.employeeName}</div>
                       <div className="text-xs text-muted-foreground">

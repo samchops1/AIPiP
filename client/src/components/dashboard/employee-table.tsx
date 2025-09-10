@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ArrowDown, ArrowUp, Minus, User } from "lucide-react";
+import { useLocation } from "wouter";
 
 interface EmployeeTableProps {
   employees?: any[];
@@ -15,6 +16,7 @@ export default function EmployeeTable({ employees, isLoading }: EmployeeTablePro
   const [page, setPage] = useState(0);
   const [filter, setFilter] = useState<string>("all");
   const itemsPerPage = 5;
+  const [, setLocation] = useLocation();
 
   const { data: performanceMetrics } = useQuery({
     queryKey: ['/api/performance-metrics'],
@@ -184,6 +186,7 @@ export default function EmployeeTable({ employees, isLoading }: EmployeeTablePro
                         <Button 
                           variant="ghost" 
                           size="sm"
+                          onClick={() => setLocation(`/employee/${employee.id}`)}
                           data-testid={`button-view-details-${employee.id}`}
                         >
                           View Details
