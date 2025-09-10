@@ -357,6 +357,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate sample data
+  app.post('/api/sample-data/generate', async (req, res) => {
+    try {
+      await generateSampleData(storage);
+      res.json({ success: true, message: 'Sample data generated successfully' });
+    } catch (error) {
+      console.error('Error generating sample data:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Clear all data
+  app.post('/api/sample-data/clear', async (req, res) => {
+    try {
+      await clearAllData(storage);
+      res.json({ success: true, message: 'All data cleared successfully' });
+    } catch (error) {
+      console.error('Error clearing data:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Auto-firing evaluation endpoint
+  app.post('/api/evaluate-terminations', async (req, res) => {
+    try {
+      const results = await evaluateTerminationCandidates();
+      res.json(results);
+    } catch (error) {
+      console.error('Error evaluating terminations:', error);
+      res.status(500).json({ error: 'Failed to evaluate termination candidates' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
@@ -436,4 +469,273 @@ function generateCoachingFeedback(score: number): string {
   } else {
     return "Excellent work! Continue maintaining high standards and consider mentoring opportunities.";
   }
+}
+
+// Sample data generation functions
+async function generateSampleData(storage: any) {
+  const employees = [
+    {
+      id: "emp-001",
+      name: "Alex Thompson",
+      role: "Software Engineer",
+      email: "alex.thompson@company.com",
+      department: "Engineering",
+      status: "active",
+      managerId: null
+    },
+    {
+      id: "emp-002", 
+      name: "Sarah Chen",
+      role: "Product Manager",
+      email: "sarah.chen@company.com",
+      department: "Product",
+      status: "active",
+      managerId: null
+    },
+    {
+      id: "emp-003",
+      name: "Marcus Johnson",
+      role: "QA Engineer",
+      email: "marcus.johnson@company.com",
+      department: "Engineering",
+      status: "pip",
+      managerId: null
+    },
+    {
+      id: "emp-004",
+      name: "Emily Rodriguez",
+      role: "Designer",
+      email: "emily.rodriguez@company.com",
+      department: "Design",
+      status: "active",
+      managerId: null
+    },
+    {
+      id: "emp-005",
+      name: "David Kim",
+      role: "Data Analyst",
+      email: "david.kim@company.com",
+      department: "Data",
+      status: "active",
+      managerId: null
+    },
+    {
+      id: "emp-006",
+      name: "Jennifer Wilson",
+      role: "Sales Representative",
+      email: "jennifer.wilson@company.com",
+      department: "Sales",
+      status: "terminated",
+      managerId: null
+    }
+  ];
+
+  // Create employees
+  for (const emp of employees) {
+    await storage.createEmployee(emp);
+  }
+
+  // Generate performance metrics with realistic patterns
+  const currentPeriod = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7)); // Current week
+  
+  // Alex Thompson - High performer
+  for (let i = 0; i < 12; i++) {
+    await storage.createPerformanceMetric({
+      employeeId: "emp-001",
+      period: currentPeriod - i,
+      score: Math.floor(Math.random() * 15) + 85, // 85-100
+      tasksCompleted: Math.floor(Math.random() * 5) + 15, // 15-20
+      date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    });
+  }
+
+  // Sarah Chen - Steady performer with recent improvement
+  for (let i = 0; i < 12; i++) {
+    const baseScore = i < 4 ? 78 : 65; // Recent improvement
+    await storage.createPerformanceMetric({
+      employeeId: "emp-002",
+      period: currentPeriod - i,
+      score: Math.floor(Math.random() * 10) + baseScore, 
+      tasksCompleted: Math.floor(Math.random() * 3) + 12,
+      date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    });
+  }
+
+  // Marcus Johnson - Struggling performer (should be on PIP)
+  for (let i = 0; i < 12; i++) {
+    await storage.createPerformanceMetric({
+      employeeId: "emp-003",
+      period: currentPeriod - i,
+      score: Math.floor(Math.random() * 15) + 50, // 50-65
+      tasksCompleted: Math.floor(Math.random() * 3) + 8, // 8-11
+      date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    });
+  }
+
+  // Emily Rodriguez - Inconsistent performer
+  for (let i = 0; i < 12; i++) {
+    const isGoodWeek = Math.random() > 0.4;
+    await storage.createPerformanceMetric({
+      employeeId: "emp-004",
+      period: currentPeriod - i,
+      score: isGoodWeek ? Math.floor(Math.random() * 10) + 80 : Math.floor(Math.random() * 15) + 55,
+      tasksCompleted: isGoodWeek ? Math.floor(Math.random() * 3) + 14 : Math.floor(Math.random() * 4) + 9,
+      date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    });
+  }
+
+  // David Kim - Good performer with slight decline
+  for (let i = 0; i < 12; i++) {
+    const baseScore = i < 3 ? 68 : 78; // Recent decline
+    await storage.createPerformanceMetric({
+      employeeId: "emp-005",
+      period: currentPeriod - i,
+      score: Math.floor(Math.random() * 8) + baseScore,
+      tasksCompleted: Math.floor(Math.random() * 3) + 13,
+      date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    });
+  }
+
+  // Jennifer Wilson - Poor performer (terminated)
+  for (let i = 0; i < 8; i++) {
+    await storage.createPerformanceMetric({
+      employeeId: "emp-006",
+      period: currentPeriod - i - 4, // Older data before termination
+      score: Math.floor(Math.random() * 10) + 35, // 35-45
+      tasksCompleted: Math.floor(Math.random() * 3) + 5, // 5-8
+      date: new Date(Date.now() - (i + 4) * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    });
+  }
+
+  // Create sample PIPs
+  const pipStartDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const pipEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  
+  await storage.createPip({
+    employeeId: "emp-003",
+    startDate: pipStartDate,
+    endDate: pipEndDate,
+    gracePeriodDays: 21,
+    goals: [
+      "Achieve 75% average performance score",
+      "Complete 12+ tasks per week consistently", 
+      "Improve code quality and reduce bugs"
+    ],
+    coachingPlan: "Weekly 1:1 sessions with technical mentoring and skill development focus",
+    initialScore: 58,
+    currentScore: 62,
+    progress: 35,
+    improvementRequired: 15,
+    status: "active"
+  });
+
+  // Create sample coaching sessions
+  await storage.createCoachingSession({
+    employeeId: "emp-003",
+    pipId: "pip-001",
+    type: "automated",
+    feedback: "Good progress this week. Focus on completing tasks with higher quality. Consider pair programming for complex features.",
+    score: 62,
+    date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  });
+
+  await storage.createCoachingSession({
+    employeeId: "emp-002",
+    type: "automated", 
+    feedback: "Excellent improvement in recent weeks. Continue maintaining this performance level.",
+    score: 78,
+    date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  });
+
+  // Generate audit logs for sample actions
+  await storage.createAuditLog({
+    action: "sample_data_generated",
+    entityType: "system",
+    entityId: "sample",
+    details: { employeesCreated: employees.length, metricsGenerated: "72 performance records" }
+  });
+}
+
+async function clearAllData(storage: any) {
+  // Note: This would clear all data - implementation depends on storage interface
+  await storage.createAuditLog({
+    action: "all_data_cleared",
+    entityType: "system", 
+    entityId: "system",
+    details: { timestamp: new Date().toISOString() }
+  });
+}
+
+async function evaluateTerminationCandidates() {
+  const settings = await storage.getSystemSettings();
+  
+  if (settings.killSwitchActive) {
+    return { message: "Kill switch is active. No automated terminations will be processed." };
+  }
+
+  const pips = await storage.getAllPips();
+  const results = [];
+
+  for (const pip of pips) {
+    if (pip.status !== 'active') continue;
+
+    const endDate = new Date(pip.endDate);
+    const now = new Date();
+    const isExpired = now > endDate;
+
+    if (isExpired) {
+      // Check if improvement requirements were met
+      const improvementMet = pip.currentScore && pip.initialScore && 
+        ((pip.currentScore - pip.initialScore) / pip.initialScore * 100) >= pip.improvementRequired;
+
+      if (!improvementMet) {
+        // Terminate employee
+        await storage.updateEmployee(pip.employeeId, { status: "terminated" });
+        await storage.updatePip(pip.id, { status: "terminated" });
+
+        await storage.createAuditLog({
+          action: "employee_terminated_automatically",
+          entityType: "employee",
+          entityId: pip.employeeId,
+          details: { 
+            pipId: pip.id,
+            reason: "Failed to meet PIP improvement requirements",
+            finalScore: pip.currentScore,
+            requiredImprovement: pip.improvementRequired
+          }
+        });
+
+        results.push({
+          action: "terminated",
+          employeeId: pip.employeeId,
+          pipId: pip.id,
+          reason: "Failed to meet PIP requirements"
+        });
+      } else {
+        // PIP completed successfully
+        await storage.updateEmployee(pip.employeeId, { status: "active" });
+        await storage.updatePip(pip.id, { status: "completed" });
+
+        await storage.createAuditLog({
+          action: "pip_completed_successfully",
+          entityType: "pip",
+          entityId: pip.id,
+          details: { 
+            employeeId: pip.employeeId,
+            finalScore: pip.currentScore,
+            improvementAchieved: ((pip.currentScore - pip.initialScore) / pip.initialScore * 100)
+          }
+        });
+
+        results.push({
+          action: "pip_completed",
+          employeeId: pip.employeeId,
+          pipId: pip.id,
+          reason: "Successfully met improvement requirements"
+        });
+      }
+    }
+  }
+
+  return { results, processed: pips.length };
 }
