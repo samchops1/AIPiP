@@ -10,6 +10,7 @@ export const employees = pgTable("employees", {
   department: text("department"),
   role: text("role"),
   managerId: varchar("manager_id"),
+  companyId: varchar("company_id"),
   status: text("status").notNull().default("active"), // active, pip, terminated
   createdAt: timestamp("created_at").default(sql`now()`),
   updatedAt: timestamp("updated_at").default(sql`now()`)

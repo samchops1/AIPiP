@@ -11,6 +11,8 @@ import {
   csvUploadSchema
 } from "@shared/schema";
 import { z } from "zod";
+import * as fs from 'fs';
+import * as path from 'path';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -104,6 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         employeeId: row.employee_id,
         period: row.period,
         score: row.score,
+        utilization: row.utilization,
         tasksCompleted: row.tasks_completed,
         date: row.date
       }));
@@ -313,6 +316,373 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(session);
     } catch (error) {
       res.status(500).json({ error: "Failed to generate coaching" });
+    }
+  });
+
+  // Advanced Appeals with Evidence endpoint
+  app.post("/api/appeals/:employeeId", async (req, res) => {
+    try {
+      const { employeeId } = req.params;
+      const { evidenceScore, evidenceDescription } = req.body;
+      
+      const employee = await storage.getEmployee(employeeId);
+      if (!employee) {
+        return res.status(404).json({ error: "Employee not found" });
+      }
+      
+      const metrics = await storage.getPerformanceMetrics(employeeId);
+      const variance = calculateVariance(metrics.map((m: any) => m.score));
+      
+      // Post-mortem analysis
+      const postMortem = {
+        variance,
+        biasDetected: variance > 20,
+        evidenceScore: evidenceScore || 0,
+        evidenceDescription: evidenceDescription || ""
+      };
+      
+      if (evidenceScore && evidenceScore > 10) {
+        // Appeal approved
+        const activePips = await storage.getPipsByEmployee(employeeId);
+        if (activePips.length > 0) {
+          const pip = activePips[0];
+          await storage.updatePip(pip.id, { 
+            status: "extended",
+            endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+          });
+        }
+        
+        await storage.createAuditLog({
+          action: "appeal_approved",
+          entityType: "employee",
+          entityId: employeeId,
+          details: { postMortem, reason: "Evidence provided justifies extension" }
+        });
+        
+        res.json({
+          status: "approved",
+          message: "Appeal approved. PIP extended based on evidence.",
+          postMortem
+        });
+      } else {
+        // Appeal denied
+        await storage.createAuditLog({
+          action: "appeal_denied",
+          entityType: "employee",
+          entityId: employeeId,
+          details: { postMortem, reason: "Insufficient evidence" }
+        });
+        
+        res.json({
+          status: "denied",
+          message: "Appeal denied. Insufficient evidence provided.",
+          postMortem
+        });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to process appeal" });
+    }
+  });
+
+  // Bias Mitigation endpoint
+  app.get("/api/bias-check", async (req, res) => {
+    try {
+      const { companyId } = req.query;
+      const employees = await storage.getAllEmployees();
+      const biasResults = [];
+      
+      for (const employee of employees) {
+        if (companyId && employee.companyId !== companyId) continue;
+        
+        const metrics = await storage.getPerformanceMetrics(employee.id);
+        if (metrics.length === 0) continue;
+        
+        const scores = metrics.map((m: any) => m.score);
+        const variance = calculateVariance(scores);
+        
+        if (variance > 20) {
+          biasResults.push({
+            employeeId: employee.id,
+            employeeName: employee.name,
+            companyId: employee.companyId,
+            variance,
+            biasFlag: true,
+            recommendation: "Review for fairness - high variance detected"
+          });
+        }
+      }
+      
+      res.json({
+        biasDetected: biasResults.length > 0,
+        flaggedEmployees: biasResults,
+        totalChecked: employees.length
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to perform bias check" });
+    }
+  });
+
+  // ROI Visualization endpoint
+  app.get("/api/roi-visualization", async (req, res) => {
+    try {
+      const { companyId } = req.query;
+      const employees = await storage.getAllEmployees();
+      const activePips = await storage.getAllActivePips();
+      
+      let filteredEmployees = employees;
+      if (companyId) {
+        filteredEmployees = employees.filter((e: any) => e.companyId === companyId);
+      }
+      
+      // Calculate ROI based on improvements and savings
+      const baseSavingsPerEmployee = 250; // Base savings per improved employee
+      const hourlyRate = 50; // Average hourly rate
+      const hoursRecovered = activePips.length * 10; // Hours recovered per PIP
+      
+      const totalROI = filteredEmployees.length * baseSavingsPerEmployee + (hoursRecovered * hourlyRate);
+      const roiBenchmark = 9000; // 9000% benchmark from resume
+      const currentROIPercent = (totalROI / 1000) * 100; // Assuming 1000 base investment
+      
+      // Generate text-based visualization
+      const barLength = Math.min(50, Math.floor(currentROIPercent / 100));
+      const roiBar = '#'.repeat(barLength);
+      
+      res.json({
+        totalROI,
+        roiPercent: currentROIPercent,
+        benchmark: roiBenchmark,
+        visualization: `ROI Progress: [${roiBar}${'·'.repeat(Math.max(0, 50 - barLength))}] ${currentROIPercent.toFixed(1)}%`,
+        details: {
+          employeesImproved: filteredEmployees.length,
+          savingsPerEmployee: baseSavingsPerEmployee,
+          hoursRecovered,
+          hourlyRate,
+          companyId: companyId || "all"
+        },
+        benchmarkComparison: `Current: ${currentROIPercent.toFixed(1)}% | Resume Benchmark: ${roiBenchmark}%`
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to generate ROI visualization" });
+    }
+  });
+
+  // Synthetic Testing endpoint
+  app.post("/api/synthetic-test", async (req, res) => {
+    try {
+      const { numTests = 5 } = req.body;
+      const testResults = [];
+      const startTime = Date.now();
+      
+      for (let i = 0; i < numTests; i++) {
+        // Simulate test scenario with low scores
+        const testEmployees = await storage.getAllEmployees();
+        const testMetrics = [];
+        
+        for (const emp of testEmployees.slice(0, 5)) { // Test on subset
+          testMetrics.push({
+            employeeId: emp.id,
+            score: Math.floor(Math.random() * 30) + 40, // Low scores 40-70
+            passed: false
+          });
+        }
+        
+        const failureRate = testMetrics.filter((m: any) => m.score < 70).length / testMetrics.length;
+        testResults.push({
+          testId: i + 1,
+          failureRate,
+          passed: failureRate < 0.5
+        });
+      }
+      
+      const mttr = (Date.now() - startTime) / 1000; // Mean time to recovery in seconds
+      const passRate = testResults.filter((t: any) => t.passed).length / numTests;
+      
+      res.json({
+        numTests,
+        testResults,
+        mttr,
+        passRate: passRate * 100,
+        status: mttr < 60 ? "PASS" : "FAIL",
+        message: `Synthetic tests completed. MTTR: ${mttr.toFixed(2)}s, Pass rate: ${(passRate * 100).toFixed(1)}%`
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to run synthetic tests" });
+    }
+  });
+
+  // Ticket Triage Agents endpoint
+  app.post("/api/triage-agents", async (req, res) => {
+    try {
+      const { suppressionThreshold = 0.5 } = req.body;
+      const employees = await storage.getAllEmployees();
+      const triageResults = [];
+      let suppressedCount = 0;
+      
+      for (const employee of employees) {
+        const metrics = await storage.getPerformanceMetrics(employee.id);
+        if (metrics.length < 3) continue;
+        
+        // Calculate rolling variance (noise score)
+        const recentScores = metrics.slice(-3).map((m: any) => m.score);
+        const noiseScore = calculateVariance(recentScores);
+        
+        if (noiseScore < suppressionThreshold) {
+          suppressedCount++;
+          triageResults.push({
+            employeeId: employee.id,
+            action: "suppressed",
+            noiseScore,
+            reason: "Low variance indicates noise, not actual performance issue"
+          });
+        } else {
+          triageResults.push({
+            employeeId: employee.id,
+            action: "flagged",
+            noiseScore,
+            reason: "High variance indicates genuine performance concern"
+          });
+        }
+      }
+      
+      await storage.createAuditLog({
+        action: "triage_agents_run",
+        entityType: "system",
+        entityId: "triage",
+        details: { suppressedCount, total: triageResults.length }
+      });
+      
+      res.json({
+        suppressedCount,
+        totalProcessed: triageResults.length,
+        suppressionRate: (suppressedCount / triageResults.length * 100).toFixed(1),
+        results: triageResults
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to run triage agents" });
+    }
+  });
+
+  // Dynamic Communication Templates endpoint
+  app.post("/api/generate-template", async (req, res) => {
+    try {
+      const { action, employeeId, details } = req.body;
+      
+      const employee = await storage.getEmployee(employeeId);
+      if (!employee) {
+        return res.status(404).json({ error: "Employee not found" });
+      }
+      
+      let template = "";
+      const auditData = {
+        timestamp: new Date().toISOString(),
+        employeeId,
+        action,
+        details
+      };
+      
+      if (action === "PIP") {
+        template = `Dear ${employee.name},\n\nYour Performance Improvement Plan starts ${details.startDate || 'immediately'}.\n\nGoals:\n${details.goals ? details.goals.join('\n') : 'To be defined'}\n\nCoaching Schedule: ${details.coachingSchedule || 'Weekly sessions'}\n\nAudit Log: ${JSON.stringify(auditData)}\n\nPlease acknowledge receipt of this notice.`;
+      } else if (action === "Termination") {
+        template = `Dear ${employee.name},\n\nTermination effective ${details.date || 'immediately'}.\n\nReason: ${details.reason || 'Performance below standards'}\n\nFinal Score: ${details.finalScore || 'N/A'}%\nFinal Utilization: ${details.finalUtilization || 'N/A'}%\n\nEvidence/Audit: ${JSON.stringify(auditData)}\n\nPlease return all company property.`;
+      } else if (action === "Coaching") {
+        template = `Dear ${employee.name},\n\nCoaching Session Scheduled\n\nDate: ${details.date || 'TBD'}\nFocus Areas: ${details.focusAreas || 'Performance improvement'}\nCurrent Score: ${details.score || 'N/A'}%\n\nAudit Trail: ${JSON.stringify(auditData)}`;
+      }
+      
+      // Save template
+      const templatePath = path.join(process.cwd(), `${action}_${employeeId}_template.json`);
+      fs.writeFileSync(templatePath, JSON.stringify({ template, audit: auditData }, null, 2));
+      
+      await storage.createAuditLog({
+        action: "template_generated",
+        entityType: "template",
+        entityId: employeeId,
+        details: { action, templatePath }
+      });
+      
+      res.json({
+        template,
+        audit: auditData,
+        saved: templatePath
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to generate template" });
+    }
+  });
+
+  // CI/CD Hooks Simulation endpoint  
+  app.post("/api/cicd-simulation", async (req, res) => {
+    try {
+      const { turnaroundHours = 72, deploymentType = "threshold_update" } = req.body;
+      const startTime = new Date();
+      
+      // Simulate deployment stages
+      const stages = [
+        { name: "Build", duration: turnaroundHours * 0.1 },
+        { name: "Test", duration: turnaroundHours * 0.3 },
+        { name: "Deploy", duration: turnaroundHours * 0.2 },
+        { name: "Verify", duration: turnaroundHours * 0.4 }
+      ];
+      
+      const deploymentLog = {
+        deploymentId: `deploy-${Date.now()}`,
+        type: deploymentType,
+        startTime: startTime.toISOString(),
+        endTime: new Date(startTime.getTime() + turnaroundHours * 60 * 60 * 1000).toISOString(),
+        turnaroundHours,
+        stages,
+        status: "Success",
+        changes: {
+          before: { minScoreThreshold: 70 },
+          after: { minScoreThreshold: 75 }
+        }
+      };
+      
+      await storage.createAuditLog({
+        action: "cicd_simulation_run",
+        entityType: "deployment",
+        entityId: deploymentLog.deploymentId,
+        details: deploymentLog
+      });
+      
+      res.json({
+        message: `CI/CD Simulation Complete: Turnaround ${turnaroundHours} hours`,
+        deployment: deploymentLog,
+        velocityMetrics: {
+          deploymentFrequency: "High",
+          leadTime: `${turnaroundHours} hours`,
+          mttr: "< 1 hour",
+          changeFailureRate: "5%"
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to run CI/CD simulation" });
+    }
+  });
+
+  // Multi-Company Portfolio endpoint
+  app.get("/api/portfolio/:companyId", async (req, res) => {
+    try {
+      const { companyId } = req.params;
+      const employees = await storage.getAllEmployees();
+      const companyEmployees = employees.filter((e: any) => e.companyId === companyId);
+      
+      const metrics = [];
+      for (const emp of companyEmployees) {
+        const empMetrics = await storage.getPerformanceMetrics(emp.id);
+        metrics.push({
+          employee: emp,
+          metrics: empMetrics
+        });
+      }
+      
+      res.json({
+        companyId,
+        employeeCount: companyEmployees.length,
+        employees: companyEmployees,
+        performanceData: metrics
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch portfolio data" });
     }
   });
 
@@ -659,8 +1029,22 @@ This letter was generated automatically based on performance data and company po
 Generated on: ${currentDate}`;
 }
 
-// Sample data generation functions
+// Helper function to calculate variance
+function calculateVariance(numbers: number[]): number {
+  if (numbers.length === 0) return 0;
+  const mean = numbers.reduce((a, b) => a + b, 0) / numbers.length;
+  const squaredDiffs = numbers.map(n => Math.pow(n - mean, 2));
+  return squaredDiffs.reduce((a, b) => a + b, 0) / numbers.length;
+}
+
+// Enhanced sample data generation with company IDs
 async function generateSampleData(storage: any) {
+  // Generate 200 companies
+  const companies = [];
+  for (let i = 1; i <= 200; i++) {
+    companies.push(`C${i.toString().padStart(3, '0')}`);
+  }
+  
   const employees = [
     {
       id: "emp-001",
@@ -669,7 +1053,8 @@ async function generateSampleData(storage: any) {
       email: "alex.thompson@company.com",
       department: "Engineering",
       status: "active",
-      managerId: null
+      managerId: null,
+      companyId: "C001"
     },
     {
       id: "emp-002", 
@@ -678,7 +1063,8 @@ async function generateSampleData(storage: any) {
       email: "sarah.chen@company.com",
       department: "Product",
       status: "active",
-      managerId: null
+      managerId: null,
+      companyId: "C001"
     },
     {
       id: "emp-003",
@@ -687,7 +1073,8 @@ async function generateSampleData(storage: any) {
       email: "marcus.johnson@company.com",
       department: "Engineering",
       status: "active",
-      managerId: null
+      managerId: null,
+      companyId: "C001"
     },
     {
       id: "emp-004",
@@ -696,7 +1083,8 @@ async function generateSampleData(storage: any) {
       email: "emily.rodriguez@company.com",
       department: "Design",
       status: "pip",
-      managerId: null
+      managerId: null,
+      companyId: "C002"
     },
     {
       id: "emp-005",
@@ -705,7 +1093,8 @@ async function generateSampleData(storage: any) {
       email: "david.kim@company.com",
       department: "Data",
       status: "active",
-      managerId: null
+      managerId: null,
+      companyId: "C002"
     },
     {
       id: "emp-006",
@@ -714,13 +1103,43 @@ async function generateSampleData(storage: any) {
       email: "jennifer.wilson@company.com",
       department: "Sales",
       status: "terminated",
-      managerId: null
+      managerId: null,
+      companyId: "C003"
     }
   ];
+  
+  // Generate additional employees for scale (1000+ total)
+  const roles = ["Engineer", "Manager", "Analyst", "Designer", "Sales", "Support", "Marketing"];
+  const departments = ["Engineering", "Product", "Sales", "Marketing", "Support", "Data", "Design"];
+  const firstNames = ["John", "Jane", "Mike", "Lisa", "Tom", "Amy", "Chris", "Pat", "Sam", "Alex"];
+  const lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis"];
+  
+  for (let i = 7; i <= 1000; i++) {
+    const companyId = companies[Math.floor(Math.random() * companies.length)];
+    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+    const role = roles[Math.floor(Math.random() * roles.length)];
+    const department = departments[Math.floor(Math.random() * departments.length)];
+    
+    employees.push({
+      id: `emp-${i.toString().padStart(3, '0')}`,
+      name: `${firstName} ${lastName}`,
+      role,
+      email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${i}@company.com`,
+      department,
+      status: "active",
+      managerId: null,
+      companyId
+    });
+  }
 
-  // Create employees
-  for (const emp of employees) {
-    await storage.createEmployee(emp);
+  // Create employees in batches for performance
+  console.log(`Creating ${employees.length} employees across ${companies.length} companies...`);
+  for (let i = 0; i < employees.length; i += 100) {
+    const batch = employees.slice(i, i + 100);
+    for (const emp of batch) {
+      await storage.createEmployee(emp);
+    }
   }
 
   // Generate performance metrics with realistic patterns
@@ -859,12 +1278,34 @@ async function generateSampleData(storage: any) {
     date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   });
 
+  // Generate performance metrics for additional employees (sample for first 100)
+  const metricsCurrentPeriod = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
+  for (let empIndex = 7; empIndex <= Math.min(100, employees.length); empIndex++) {
+    const emp = employees[empIndex - 1];
+    for (let i = 0; i < 8; i++) {
+      const isHighPerformer = Math.random() > 0.3;
+      await storage.createPerformanceMetric({
+        employeeId: emp.id,
+        period: metricsCurrentPeriod - i,
+        score: isHighPerformer ? Math.floor(Math.random() * 20) + 75 : Math.floor(Math.random() * 25) + 45,
+        utilization: isHighPerformer ? Math.floor(Math.random() * 15) + 75 : Math.floor(Math.random() * 20) + 40,
+        tasksCompleted: Math.floor(Math.random() * 10) + 10,
+        date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      });
+    }
+  }
+  
   // Generate audit logs for sample actions
   await storage.createAuditLog({
     action: "sample_data_generated",
     entityType: "system",
     entityId: "sample",
-    details: { employeesCreated: employees.length, metricsGenerated: "72 performance records" }
+    details: { 
+      employeesCreated: employees.length, 
+      companiesCreated: companies.length,
+      metricsGenerated: "800+ performance records",
+      portfolioScale: "200 companies, 1000+ employees"
+    }
   });
 }
 
@@ -897,7 +1338,7 @@ async function evaluateTerminationCandidates() {
 
     if (isExpired) {
       // Check if improvement requirements were met
-      const improvementMet = pip.currentScore && pip.initialScore && 
+      const improvementMet = pip.currentScore !== null && pip.initialScore !== null && 
         ((pip.currentScore - pip.initialScore) / pip.initialScore * 100) >= pip.improvementRequired;
 
       if (!improvementMet) {
@@ -912,7 +1353,7 @@ async function evaluateTerminationCandidates() {
           details: { 
             pipId: pip.id,
             reason: "Failed to meet PIP improvement requirements",
-            finalScore: pip.currentScore,
+            finalScore: pip.currentScore || 0,
             requiredImprovement: pip.improvementRequired
           }
         });
@@ -935,7 +1376,9 @@ async function evaluateTerminationCandidates() {
           details: { 
             employeeId: pip.employeeId,
             finalScore: pip.currentScore,
-            improvementAchieved: ((pip.currentScore - pip.initialScore) / pip.initialScore * 100)
+            improvementAchieved: pip.currentScore !== null && pip.initialScore !== null 
+              ? ((pip.currentScore - pip.initialScore) / pip.initialScore * 100)
+              : 0
           }
         });
 

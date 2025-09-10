@@ -31,8 +31,10 @@ export interface IStorage {
   
   // PIPs
   getPip(id: string): Promise<Pip | undefined>;
+  getPipById(id: string): Promise<Pip | undefined>;
   getPipsByEmployee(employeeId: string): Promise<Pip[]>;
   getAllActivePips(): Promise<Pip[]>;
+  getAllPips(): Promise<Pip[]>;
   createPip(pip: InsertPip): Promise<Pip>;
   updatePip(id: string, updates: Partial<Pip>): Promise<Pip | undefined>;
   
@@ -97,6 +99,7 @@ export class MemStorage implements IStorage {
       email: insertEmployee.email || null,
       department: insertEmployee.department || null,
       managerId: insertEmployee.managerId || null,
+      companyId: insertEmployee.companyId || null,
       status: insertEmployee.status || "active",
       createdAt: new Date(),
       updatedAt: new Date()
@@ -166,6 +169,10 @@ export class MemStorage implements IStorage {
       .filter(pip => pip.status === "active");
   }
 
+  async getAllPips(): Promise<Pip[]> {
+    return Array.from(this.pips.values());
+  }
+
   async getPipById(id: string): Promise<Pip | undefined> {
     return this.pips.get(id);
   }
@@ -176,6 +183,7 @@ export class MemStorage implements IStorage {
       ...insertPip,
       id,
       status: insertPip.status || "active",
+      gracePeriodDays: insertPip.gracePeriodDays || 21,
       progress: insertPip.progress || 0,
       initialScore: insertPip.initialScore || null,
       currentScore: insertPip.currentScore || null,

@@ -15,8 +15,11 @@ import {
   Calendar, 
   TrendingUp,
   Send,
-  Search
+  Search,
+  Download
 } from "lucide-react";
+// @ts-ignore
+import jsPDF from 'jspdf';
 
 export default function CoachingSystem() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
@@ -110,6 +113,41 @@ export default function CoachingSystem() {
     if (empMetrics.length === 0) return null;
     const latest = empMetrics.sort((a: any, b: any) => b.period - a.period)[0];
     return latest?.score || null;
+  };
+
+  const downloadCoachingReport = (session: any) => {
+    try {
+      const doc = new jsPDF();
+      const employee = (employees as any[])?.find((e: any) => e.id === session.employeeId);
+      
+      // Set title
+      doc.setFontSize(16);
+      doc.text('COACHING SESSION REPORT', 20, 20);
+      
+      // Employee info
+      doc.setFontSize(12);
+      doc.text(`Employee: ${employee?.name || session.employeeId}`, 20, 40);
+      doc.text(`Date: ${session.date}`, 20, 50);
+      doc.text(`Type: ${session.type}`, 20, 60);
+      if (session.score) {
+        doc.text(`Performance Score: ${session.score}%`, 20, 70);
+      }
+      if (session.pipId) {
+        doc.text(`PIP Session ID: ${session.pipId}`, 20, 80);
+      }
+      
+      // Feedback content
+      doc.setFontSize(11);
+      doc.text('Coaching Feedback:', 20, 100);
+      const lines = doc.splitTextToSize(session.feedback, 170);
+      doc.text(lines, 20, 110);
+      
+      // Download the PDF
+      const fileName = `Coaching_Report_${employee?.name.replace(/\s+/g, '_') || session.employeeId}_${session.date}.pdf`;
+      doc.save(fileName);
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+    }
   };
 
   const autoGenerateCoachingForPips = useMutation({
@@ -311,9 +349,21 @@ export default function CoachingSystem() {
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center text-xs text-muted-foreground">
-                          <Calendar className="w-3 h-3 mr-1" />
-                          {session.date}
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => downloadCoachingReport(session)}
+                            className="h-7 px-2 text-xs"
+                            data-testid={`button-download-coaching-${session.id}`}
+                          >
+                            <Download className="w-3 h-3 mr-1" />
+                            PDF
+                          </Button>
+                          <div className="flex items-center text-xs text-muted-foreground">
+                            <Calendar className="w-3 h-3 mr-1" />
+                            {session.date}
+                          </div>
                         </div>
                       </div>
                       

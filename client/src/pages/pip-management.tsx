@@ -130,11 +130,7 @@ export default function PipManagement() {
         status: 'active'
       };
 
-      return apiRequest('/api/pips', { 
-        method: 'POST',
-        body: JSON.stringify(pipData),
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return apiRequest('POST', '/api/pips', pipData);
     },
     onSuccess: () => {
       toast({
