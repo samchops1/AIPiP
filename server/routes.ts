@@ -149,13 +149,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (employeeId) {
         const pips = await storage.getPipsByEmployee(employeeId as string);
-        res.json(pips);
+        const pipsWithNames = await Promise.all(pips.map(async (pip: any) => {
+          const employee = await storage.getEmployee(pip.employeeId);
+          return {
+            ...pip,
+            employeeName: employee?.name || `Employee ${pip.employeeId}`
+          };
+        }));
+        res.json(pipsWithNames);
       } else if (active === "true") {
         const pips = await storage.getAllActivePips();
-        res.json(pips);
+        const pipsWithNames = await Promise.all(pips.map(async (pip: any) => {
+          const employee = await storage.getEmployee(pip.employeeId);
+          return {
+            ...pip,
+            employeeName: employee?.name || `Employee ${pip.employeeId}`
+          };
+        }));
+        res.json(pipsWithNames);
       } else {
         const pips = await storage.getAllActivePips();
-        res.json(pips);
+        const pipsWithNames = await Promise.all(pips.map(async (pip: any) => {
+          const employee = await storage.getEmployee(pip.employeeId);
+          return {
+            ...pip,
+            employeeName: employee?.name || `Employee ${pip.employeeId}`
+          };
+        }));
+        res.json(pipsWithNames);
       }
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch PIPs" });
@@ -775,7 +796,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const metrics = await storage.getAllPerformanceMetrics();
       const terminated = [];
 
-      // Find employees with consistently poor performance AND utilization
+      // Find employees with consistently poor performance OR utilization
+      console.log(`Evaluating ${employees.length} employees with thresholds: score < ${settings.minScoreThreshold}%, utilization < ${settings.minUtilizationThreshold}%`);
+      
       for (const employee of employees) {
         if (employee.status !== 'active') continue;
 
@@ -789,6 +812,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             m.score < settings.minScoreThreshold || 
             m.utilization < settings.minUtilizationThreshold
           );
+          
+          // Debug logging
+          if (employeeMetrics.some(m => m.score < settings.minScoreThreshold || m.utilization < settings.minUtilizationThreshold)) {
+            console.log(`Employee ${employee.id} has some low metrics:`, employeeMetrics.map(m => `Score: ${m.score}%, Util: ${m.utilization}%`));
+          }
 
           if (allLowPerformance) {
             const latestMetric = employeeMetrics[0];

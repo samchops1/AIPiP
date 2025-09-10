@@ -139,7 +139,7 @@ export default function PipCards({ pips, isLoading }: PipCardsProps) {
                         </div>
                         <div>
                           <p className="font-medium text-sm" data-testid={`pip-employee-name-${pip.id}`}>
-                            Employee {pip.employeeId}
+                            {pip.employeeName || `Employee ${pip.employeeId}`}
                           </p>
                           <p className="text-xs text-muted-foreground">{pip.employeeId}</p>
                         </div>
@@ -188,16 +188,18 @@ export default function PipCards({ pips, isLoading }: PipCardsProps) {
                       </div>
                     </div>
 
-                    {pip.initialScore && pip.currentScore && (
+                    {(pip.initialScore || pip.currentScore) && (
                       <div className="text-xs space-y-1 mb-3 p-2 bg-muted rounded">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Initial Score:</span>
-                          <span>{pip.initialScore}</span>
-                        </div>
+                        {pip.initialScore && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Initial Score:</span>
+                            <span>{pip.initialScore}%</span>
+                          </div>
+                        )}
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Current Score:</span>
                           <span className={pip.currentScore > pip.initialScore ? 'text-accent font-medium' : ''}>
-                            {pip.currentScore}
+                            {pip.currentScore || pip.initialScore}%
                           </span>
                         </div>
                       </div>
