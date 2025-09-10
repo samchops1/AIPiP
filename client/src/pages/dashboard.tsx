@@ -34,7 +34,7 @@ export default function Dashboard() {
   });
 
   const generateSampleDataMutation = useMutation({
-    mutationFn: () => apiRequest('/api/sample-data/generate', { method: 'POST' }),
+    mutationFn: () => apiRequest('POST', '/api/sample-data/generate'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard-metrics'] });
@@ -56,7 +56,7 @@ export default function Dashboard() {
   });
 
   const clearDataMutation = useMutation({
-    mutationFn: () => apiRequest('/api/sample-data/clear', { method: 'POST' }),
+    mutationFn: () => apiRequest('POST', '/api/sample-data/clear'),
     onSuccess: () => {
       queryClient.invalidateQueries();
       toast({
