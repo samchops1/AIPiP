@@ -8,6 +8,14 @@ PIP-AutoFire is an AI-driven talent management system designed to automate Perfo
 
 Preferred communication style: Simple, everyday language.
 
+## Quick Python Demo
+
+For interview demos, a standalone Python script is included.
+
+1. Install pandas if needed: `pip install pandas`
+2. Run the workflow: `python pip_autofire.py`
+3. Review `pip_log.json` and `termination_log.json` for audit trails.
+
 ## System Architecture
 
 ### Frontend Architecture
