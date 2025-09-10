@@ -495,6 +495,55 @@ function generateCoachingFeedback(score: number): string {
   }
 }
 
+function generateTerminationLetter(
+  employeeName: string, 
+  role: string, 
+  finalScore: number, 
+  finalUtilization: number, 
+  reasons: string[]
+): string {
+  const currentDate = new Date().toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+
+  return `EMPLOYMENT TERMINATION NOTICE
+
+Date: ${currentDate}
+
+Dear ${employeeName},
+
+This letter serves as formal notice that your employment with our organization in the position of ${role} is terminated effective immediately.
+
+PERFORMANCE SUMMARY:
+• Final Performance Score: ${finalScore}%
+• Final Utilization Rate: ${finalUtilization}%
+
+REASONS FOR TERMINATION:
+${reasons.map(reason => `• ${reason}`).join('\n')}
+
+This decision is based on documented performance issues and failure to meet the minimum standards required for your position. Despite previous coaching efforts and performance improvement opportunities, the required improvements have not been achieved.
+
+Your final paycheck, including any accrued vacation time, will be processed according to company policy and applicable law. Please return all company property, including but not limited to:
+• Company equipment (laptop, phone, keys, etc.)
+• Access cards and identification
+• Any confidential or proprietary materials
+
+For questions regarding benefits continuation or final pay, please contact Human Resources.
+
+We wish you success in your future endeavors.
+
+Sincerely,
+
+Human Resources Department
+Automated HR Management System
+
+---
+This letter was generated automatically based on performance data and company policies.
+Generated on: ${currentDate}`;
+}
+
 // Sample data generation functions
 async function generateSampleData(storage: any) {
   const employees = [
@@ -568,6 +617,7 @@ async function generateSampleData(storage: any) {
       employeeId: "emp-001",
       period: currentPeriod - i,
       score: Math.floor(Math.random() * 15) + 85, // 85-100
+      utilization: Math.floor(Math.random() * 10) + 85, // 85-95% utilization
       tasksCompleted: Math.floor(Math.random() * 5) + 15, // 15-20
       date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
@@ -576,10 +626,12 @@ async function generateSampleData(storage: any) {
   // Sarah Chen - Steady performer with recent improvement
   for (let i = 0; i < 12; i++) {
     const baseScore = i < 4 ? 78 : 65; // Recent improvement
+    const baseUtilization = i < 4 ? 75 : 68; // Improving utilization
     await storage.createPerformanceMetric({
       employeeId: "emp-002",
       period: currentPeriod - i,
       score: Math.floor(Math.random() * 10) + baseScore, 
+      utilization: Math.floor(Math.random() * 8) + baseUtilization, // 68-83%
       tasksCompleted: Math.floor(Math.random() * 3) + 12,
       date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
@@ -591,6 +643,7 @@ async function generateSampleData(storage: any) {
       employeeId: "emp-003",
       period: currentPeriod - i,
       score: Math.floor(Math.random() * 15) + 50, // 50-65
+      utilization: Math.floor(Math.random() * 15) + 45, // 45-60% poor utilization
       tasksCompleted: Math.floor(Math.random() * 3) + 8, // 8-11
       date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
@@ -603,6 +656,7 @@ async function generateSampleData(storage: any) {
       employeeId: "emp-004",
       period: currentPeriod - i,
       score: isGoodWeek ? Math.floor(Math.random() * 10) + 80 : Math.floor(Math.random() * 15) + 55,
+      utilization: isGoodWeek ? Math.floor(Math.random() * 10) + 75 : Math.floor(Math.random() * 15) + 50, // Inconsistent 50-85%
       tasksCompleted: isGoodWeek ? Math.floor(Math.random() * 3) + 14 : Math.floor(Math.random() * 4) + 9,
       date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
@@ -611,10 +665,12 @@ async function generateSampleData(storage: any) {
   // David Kim - Good performer with slight decline
   for (let i = 0; i < 12; i++) {
     const baseScore = i < 3 ? 68 : 78; // Recent decline
+    const baseUtilization = i < 3 ? 65 : 75; // Declining utilization 
     await storage.createPerformanceMetric({
       employeeId: "emp-005",
       period: currentPeriod - i,
       score: Math.floor(Math.random() * 8) + baseScore,
+      utilization: Math.floor(Math.random() * 8) + baseUtilization, // 65-83%
       tasksCompleted: Math.floor(Math.random() * 3) + 13,
       date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
@@ -626,10 +682,27 @@ async function generateSampleData(storage: any) {
       employeeId: "emp-006",
       period: currentPeriod - i - 4, // Older data before termination
       score: Math.floor(Math.random() * 10) + 35, // 35-45
+      utilization: Math.floor(Math.random() * 15) + 25, // 25-40% very poor utilization
       tasksCompleted: Math.floor(Math.random() * 3) + 5, // 5-8
       date: new Date(Date.now() - (i + 4) * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
   }
+
+  // Create termination record for Jennifer Wilson
+  await storage.createTerminatedEmployee({
+    employeeId: "emp-006",
+    employeeName: "Jennifer Wilson",
+    terminationDate: new Date(Date.now() - 4 * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    terminationReason: "Consistent poor performance and low utilization below company standards",
+    terminationLetter: generateTerminationLetter("Jennifer Wilson", "Sales Representative", 41, 32, [
+      "Consistently scored below 50% on performance metrics over 8 consecutive periods",
+      "Utilization rate consistently below 40%, significantly under company standard of 60%",
+      "Failed to meet improvement targets during performance review periods",
+      "Unable to complete minimum required tasks per week (5-8 vs required 12+)"
+    ]),
+    finalScore: 41,
+    finalUtilization: 32
+  });
 
   // Create sample PIPs
   const pipStartDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
