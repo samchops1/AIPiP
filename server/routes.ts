@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { 
+import {
   insertEmployeeSchema,
   insertPerformanceMetricSchema,
   insertPipSchema,
@@ -11,6 +11,8 @@ import {
   csvUploadSchema
 } from "@shared/schema";
 import { z } from "zod";
+import { PipEngine } from "@/lib/pip-engine";
+import { generateTerminationPdf } from "./pdf";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -313,6 +315,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(session);
     } catch (error) {
       res.status(500).json({ error: "Failed to generate coaching" });
+    }
+  });
+
+  // Evaluate PIP progress and handle termination
+  app.post("/api/pips/:id/evaluate", async (req, res) => {
+    try {
+      const pip = await storage.getPip(req.params.id);
+      if (!pip) {
+        return res.status(404).json({ error: "PIP not found" });
+      }
+
+      const employee = await storage.getEmployee(pip.employeeId);
+      if (!employee) {
+        return res.status(404).json({ error: "Employee not found" });
+      }
+
+      const metrics = await storage.getPerformanceMetrics(pip.employeeId);
+      const settings = await storage.getSystemSettings();
+      const engine = new PipEngine(settings);
+
+      const result = engine.evaluatePipProgress(
+        employee,
+        metrics,
+        pip.startDate,
+        pip.endDate,
+        pip.initialScore || 0,
+        pip.improvementRequired
+      );
+
+      if (result.shouldTerminate) {
+        await storage.updateEmployee(employee.id, { status: "terminated" });
+        await storage.updatePip(pip.id, { status: "terminated" });
+
+        const pdf = await generateTerminationPdf(
+          employee.name || employee.id,
+          new Date().toISOString().split('T')[0]
+        );
+
+        await storage.createAuditLog({
+          action: "employee_terminated",
+          entityType: "pip",
+          entityId: pip.id,
+          details: { pdf }
+        });
+
+        return res.json({ ...result, terminationPdf: pdf });
+      }
+
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to evaluate PIP progress" });
     }
   });
 
