@@ -5,6 +5,7 @@ import EmployeeTable from "@/components/dashboard/employee-table";
 import RecentActions from "@/components/dashboard/recent-actions";
 import PipCards from "@/components/dashboard/pip-cards";
 import AutoFiringModal from "@/components/modals/auto-firing-modal";
+import TerminatedEmployeeModal from "@/components/modals/terminated-employee-modal";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText, Database, Trash2, AlertTriangle, Users } from "lucide-react";
 import { Link } from "wouter";
@@ -15,6 +16,8 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [showAutoFiringModal, setShowAutoFiringModal] = useState(false);
   const [terminatedEmployeesData, setTerminatedEmployeesData] = useState([]);
+  const [showTerminatedModal, setShowTerminatedModal] = useState(false);
+  const [selectedTerminatedEmployee, setSelectedTerminatedEmployee] = useState(null);
 
   const { data: dashboardMetrics, isLoading: metricsLoading } = useQuery({
     queryKey: ['/api/dashboard-metrics'],
@@ -51,7 +54,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/audit-logs'] });
       toast({
         title: 'Sample data generated',
-        description: 'Created 6 employees with realistic performance patterns'
+        description: 'Created 1000+ employees with realistic performance patterns'
       });
     },
     onError: () => {
@@ -205,13 +208,23 @@ export default function Dashboard() {
               ) : (terminatedEmployees as any[])?.length > 0 ? (
                 <div className="space-y-2 max-h-40 overflow-y-auto">
                   {(terminatedEmployees as any[]).map((emp: any) => (
-                    <div key={emp.id} className="p-2 bg-red-50 dark:bg-red-950/20 rounded border border-red-200 dark:border-red-800">
+                    <div 
+                      key={emp.id} 
+                      className="p-2 bg-red-50 dark:bg-red-950/20 rounded border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors"
+                      onClick={() => {
+                        setSelectedTerminatedEmployee(emp);
+                        setShowTerminatedModal(true);
+                      }}
+                    >
                       <div className="text-sm font-medium">{emp.employeeName}</div>
                       <div className="text-xs text-muted-foreground">
                         Score: {emp.finalScore}% | Utilization: {emp.finalUtilization}%
                       </div>
                       <div className="text-xs text-muted-foreground">
                         Terminated: {new Date(emp.terminationDate).toLocaleDateString()}
+                      </div>
+                      <div className="text-xs text-blue-600 hover:text-blue-800 mt-1">
+                        Click for details →
                       </div>
                     </div>
                   ))}
@@ -262,6 +275,13 @@ export default function Dashboard() {
         isOpen={showAutoFiringModal}
         onClose={() => setShowAutoFiringModal(false)}
         employees={terminatedEmployeesData}
+      />
+      
+      {/* Terminated Employee Details Modal */}
+      <TerminatedEmployeeModal
+        isOpen={showTerminatedModal}
+        onClose={() => setShowTerminatedModal(false)}
+        employee={selectedTerminatedEmployee}
       />
     </div>
   );

@@ -99,95 +99,158 @@ export function generateCoachingPDF(
   type: string,
   pipId?: string
 ): Promise<string> {
-  const doc = new PDFDocument();
+  const doc = new PDFDocument({ margin: 40 });
   const fileName = `Coaching_${employeeId}_${Date.now()}.pdf`;
   const filePath = path.join(pdfDir, fileName);
   
   // Pipe to file
   doc.pipe(fs.createWriteStream(filePath));
   
-  // Header
-  doc.fontSize(20).text('COACHING SESSION DOCUMENTATION', { align: 'center' });
-  doc.moveDown();
+  // Header with better styling
+  doc.fillColor('#1a365d');
+  doc.fontSize(18).text('COACHING & DEVELOPMENT COMMUNICATION', { align: 'center' });
+  doc.fillColor('#666666');
+  doc.fontSize(10).text('Professional Development Session - Confidential Document', { align: 'center' });
+  doc.moveDown(1.5);
   
-  // Session Information
-  doc.fontSize(14).text('Session Information:', { underline: true });
-  doc.fontSize(12);
-  doc.text(`Date: ${new Date(sessionDate).toLocaleDateString('en-US', {
+  // Document info box
+  doc.fillColor('#000000');
+  doc.rect(40, doc.y, 515, 80).stroke('#cccccc');
+  const boxY = doc.y + 10;
+  doc.fontSize(10);
+  doc.text(`Session Date: ${new Date(sessionDate).toLocaleDateString('en-US', {
     year: 'numeric',
-    month: 'long',
+    month: 'long', 
     day: 'numeric'
-  })}`);
-  doc.text(`Type: ${type.charAt(0).toUpperCase() + type.slice(1)}`);
+  })}`, 50, boxY);
+  doc.text(`Employee: ${employeeName}`, 50, boxY + 15);
+  doc.text(`Employee ID: ${employeeId}`, 50, boxY + 30);
+  doc.text(`Position: [Role]`, 50, boxY + 45);
+  doc.text(`Session Type: ${type.charAt(0).toUpperCase() + type.slice(1)}`, 300, boxY);
+  doc.text(`Performance Score: ${score}%`, 300, boxY + 15);
   if (pipId) {
-    doc.text(`Related PIP ID: ${pipId}`);
+    doc.text(`PIP ID: ${pipId}`, 300, boxY + 30);
   }
+  
+  // Performance level indicator
+  let performanceLevel = 'Needs Immediate Attention';
+  let levelColor = '#d32f2f';
+  if (score >= 90) {
+    performanceLevel = 'Excellent';
+    levelColor = '#2e7d32';
+  } else if (score >= 80) {
+    performanceLevel = 'Good';
+    levelColor = '#388e3c';
+  } else if (score >= 70) {
+    performanceLevel = 'Satisfactory';
+    levelColor = '#f57c00';
+  }
+  
+  doc.fillColor(levelColor);
+  doc.text(`Status: ${performanceLevel}`, 300, boxY + 45);
+  doc.fillColor('#000000');
+  
+  doc.y += 100;
   doc.moveDown();
   
-  // Employee Information
-  doc.fontSize(14).text('Employee Information:', { underline: true });
+  // Clean up feedback text for PDF (remove formatting characters)
+  const cleanFeedback = feedback
+    .replace(/━{50,}/g, '') // Remove long lines
+    .replace(/┌[─\s\w]*┐/g, '') // Remove box tops
+    .replace(/└[─\s]*┘/g, '') // Remove box bottoms  
+    .replace(/[📚✅🤝🎓👥💡💰📊🎯👂📝⭐]/g, '') // Remove emojis
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+  
+  // Split feedback into sections for better formatting
+  const sections = cleanFeedback.split(/([A-Z\s&]+:)/g).filter(s => s.trim());
+  
   doc.fontSize(12);
-  doc.text(`Name: ${employeeName}`);
-  doc.text(`Employee ID: ${employeeId}`);
-  doc.text(`Current Performance Score: ${score}%`);
-  doc.moveDown();
+  for (let i = 0; i < sections.length; i += 2) {
+    if (sections[i] && sections[i + 1]) {
+      const title = sections[i].trim();
+      const content = sections[i + 1].trim();
+      
+      // Section header
+      doc.fillColor('#1a365d');
+      doc.fontSize(12).text(title, { underline: title.length < 50 });
+      doc.fillColor('#000000');
+      doc.fontSize(10);
+      doc.moveDown(0.3);
+      
+      // Section content with proper line breaks
+      const lines = content.split('\n').filter(line => line.trim());
+      for (const line of lines) {
+        const cleanLine = line.replace(/^[•\-\s]*/, '• ').trim();
+        if (cleanLine && cleanLine !== '•') {
+          doc.text(cleanLine, { align: 'justify', indent: 15 });
+        }
+      }
+      doc.moveDown(0.8);
+    }
+  }
   
-  // Performance Analysis
-  doc.fontSize(14).text('Performance Analysis:', { underline: true });
-  doc.fontSize(12);
-  let performanceLevel = 'Needs Improvement';
-  if (score >= 90) performanceLevel = 'Excellent';
-  else if (score >= 80) performanceLevel = 'Good';
-  else if (score >= 70) performanceLevel = 'Satisfactory';
+  // Add new page if needed
+  if (doc.y > doc.page.height - 150) {
+    doc.addPage();
+  }
   
-  doc.text(`Performance Level: ${performanceLevel}`);
-  doc.text(`Score Trend: ${score < 70 ? 'Below Expectations' : score < 80 ? 'Meeting Expectations' : 'Exceeding Expectations'}`);
-  doc.moveDown();
+  // Action Items section
+  doc.fillColor('#1a365d');
+  doc.fontSize(12).text('RECOMMENDED ACTION ITEMS', { underline: true });
+  doc.fillColor('#000000');
+  doc.fontSize(10);
+  doc.moveDown(0.5);
   
-  // Feedback
-  doc.fontSize(14).text('Coaching Feedback:', { underline: true });
-  doc.fontSize(11);
-  doc.text(feedback, { align: 'justify' });
-  doc.moveDown();
-  
-  // Action Items
-  doc.fontSize(14).text('Recommended Action Items:', { underline: true });
-  doc.fontSize(11);
+  const actionItems = [];
   if (score < 60) {
-    doc.text('• Immediate performance improvement required');
-    doc.text('• Daily check-ins with supervisor');
-    doc.text('• Complete additional training modules');
-    doc.text('• Review and acknowledge performance standards');
+    actionItems.push('Immediate performance improvement required - daily check-ins');
+    actionItems.push('Complete additional training modules within 2 weeks');
+    actionItems.push('Submit work for review before final completion');
+    actionItems.push('Document questions and challenges for discussion');
   } else if (score < 70) {
-    doc.text('• Focus on consistency in task completion');
-    doc.text('• Weekly progress reviews');
-    doc.text('• Identify and address skill gaps');
-    doc.text('• Seek clarification on expectations');
+    actionItems.push('Focus on consistency in task completion and quality');
+    actionItems.push('Weekly progress reviews with supervisor');
+    actionItems.push('Identify and address specific skill gaps');
+    actionItems.push('Seek clarification on expectations proactively');
   } else if (score < 80) {
-    doc.text('• Continue current improvement trajectory');
-    doc.text('• Bi-weekly check-ins');
-    doc.text('• Focus on quality metrics');
-    doc.text('• Document best practices');
+    actionItems.push('Continue current improvement trajectory with focus on quality');
+    actionItems.push('Bi-weekly check-ins to maintain momentum');
+    actionItems.push('Document and share best practices with team');
+    actionItems.push('Prepare for increased responsibilities');
   } else {
-    doc.text('• Maintain high performance standards');
-    doc.text('• Consider mentoring opportunities');
-    doc.text('• Share best practices with team');
-    doc.text('• Explore advancement opportunities');
+    actionItems.push('Maintain high performance standards as role model');
+    actionItems.push('Consider mentoring opportunities for junior team members');
+    actionItems.push('Share expertise through training or documentation');
+    actionItems.push('Explore advancement and leadership opportunities');
   }
+  
+  actionItems.forEach(item => {
+    doc.text(`• ${item}`, { indent: 15 });
+  });
+  
   doc.moveDown();
   
-  // Next Session
-  doc.fontSize(12).text('Next Session:', { underline: true });
+  // Next steps
+  doc.fillColor('#1a365d');
+  doc.fontSize(12).text('NEXT STEPS & FOLLOW-UP', { underline: true });
+  doc.fillColor('#000000');
+  doc.fontSize(10);
+  doc.moveDown(0.5);
+  
   const nextSessionDate = new Date(sessionDate);
   nextSessionDate.setDate(nextSessionDate.getDate() + 7);
-  doc.text(`Scheduled for: ${nextSessionDate.toLocaleDateString('en-US')}`);
+  
+  doc.text(`• Next coaching session: ${nextSessionDate.toLocaleDateString('en-US')}`);
+  doc.text('• Progress review and goal adjustment as needed');
+  doc.text('• Continued support through available development resources');
   doc.moveDown();
   
   // Footer
-  doc.fontSize(10).fillColor('gray');
-  doc.text('HR Coaching & Development', { align: 'center' });
-  doc.text('Automated Coaching System', { align: 'center' });
-  doc.text(`Generated on: ${new Date().toLocaleString()}`, { align: 'center' });
+  doc.fontSize(8).fillColor('#666666');
+  doc.text(`Generated: ${new Date().toLocaleString()}`, 40, doc.page.height - 50);
+  doc.text('Coaching & Development - Confidential HR Document', 40, doc.page.height - 35);
+  doc.text(`Page 1 of 1 | Session ID: ${employeeId}-${Date.now()}`, 400, doc.page.height - 35);
   
   // Finalize PDF and wait for completion
   return new Promise((resolve, reject) => {

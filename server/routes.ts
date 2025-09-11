@@ -324,7 +324,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const employee = await storage.getEmployee(employeeId);
-      const feedback = generateCoachingFeedback(score, employee?.name, employee?.role || "Employee");
+      if (!employee) {
+        return res.status(404).json({ error: "Employee not found" });
+      }
+      
+      // Check if employee is terminated
+      const terminatedEmployees = await storage.getTerminatedEmployees();
+      const isTerminated = terminatedEmployees.some((emp: any) => emp.employeeId === employeeId);
+      
+      
+      if (isTerminated) {
+        return res.status(400).json({ 
+          error: "Cannot generate coaching for terminated employee", 
+          message: `${employee.name} has been terminated and is no longer eligible for coaching sessions.` 
+        });
+      }
+      
+      // Check if employee is on PIP
+      const activePips = await storage.getAllPips();
+      const employeePip = activePips.find((pip: any) => pip.employeeId === employeeId && pip.status === 'active');
+      
+      // Get recent performance metrics for context
+      const performanceMetrics = await storage.getPerformanceMetrics(employeeId);
+      const recentMetrics = performanceMetrics?.slice(0, 3) || [];
+      
+      const feedback = generateCoachingFeedback(
+        score, 
+        employee.name, 
+        employee.role || "Employee", 
+        {
+          ...employee,
+          isOnPip: !!employeePip,
+          pipDetails: employeePip,
+          recentPerformance: recentMetrics,
+          status: employee.status
+        }
+      );
       
       // Generate PDF for coaching session
       if (employee) {
@@ -358,6 +393,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(session);
     } catch (error) {
       res.status(500).json({ error: "Failed to generate coaching" });
+    }
+  });
+
+  // Debug endpoint to check specific employees
+  app.get("/api/debug/employees/:employeeId", async (req, res) => {
+    try {
+      const { employeeId } = req.params;
+      const employee = await storage.getEmployee(employeeId);
+      const metrics = await storage.getAllPerformanceMetrics();
+      const settings = await storage.getSystemSettings();
+      
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+      
+      const employeeMetrics = metrics
+        .filter(m => m.employeeId === employeeId)
+        .sort((a, b) => b.period - a.period)
+        .slice(0, settings.consecutiveLowPeriods);
+      
+      const allLowPerformance = employeeMetrics.every(m => 
+        m.score < settings.minScoreThreshold || 
+        m.utilization < settings.minUtilizationThreshold
+      );
+      
+      res.json({
+        employee,
+        recentMetrics: employeeMetrics,
+        settings: {
+          minScoreThreshold: settings.minScoreThreshold,
+          minUtilizationThreshold: settings.minUtilizationThreshold,
+          consecutiveLowPeriods: settings.consecutiveLowPeriods
+        },
+        evaluation: {
+          hasEnoughMetrics: employeeMetrics.length >= settings.consecutiveLowPeriods,
+          allLowPerformance,
+          shouldTerminate: employeeMetrics.length >= settings.consecutiveLowPeriods && allLowPerformance,
+          individualChecks: employeeMetrics.map(m => ({
+            period: m.period,
+            score: m.score,
+            utilization: m.utilization,
+            scoreBelowThreshold: m.score < settings.minScoreThreshold,
+            utilizationBelowThreshold: m.utilization < settings.minUtilizationThreshold,
+            meetsTerminationCriteria: m.score < settings.minScoreThreshold || m.utilization < settings.minUtilizationThreshold
+          }))
+        }
+      });
+    } catch (error) {
+      console.error('Debug error:', error);
+      res.status(500).json({ error: 'Debug endpoint failed' });
     }
   });
 
@@ -753,7 +838,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const auditLogs = await storage.getAuditLogs();
       const todayActions = auditLogs.filter(log => 
         log.timestamp && log.timestamp.toISOString().split('T')[0] === today &&
-        (log.action === 'pip_created' || log.action === 'coaching_session_created')
+        ['pip_created', 'coaching_session_created', 'employee_auto_terminated', 'pip_created_automatically', 'coaching_generated'].includes(log.action)
       );
       
       const metrics = {
@@ -780,6 +865,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Termination PDF download endpoint
+  app.get("/api/employees/:employeeId/termination-pdf", async (req, res) => {
+    try {
+      const { employeeId } = req.params;
+      const terminatedEmployees = await storage.getTerminatedEmployees();
+      const terminatedEmployee = terminatedEmployees.find((emp: any) => emp.employeeId === employeeId);
+      
+      if (!terminatedEmployee) {
+        return res.status(404).json({ error: "Terminated employee not found" });
+      }
+
+      // Get the employee details for PDF generation
+      const employee = await storage.getEmployee(employeeId);
+      if (!employee) {
+        return res.status(404).json({ error: "Employee details not found" });
+      }
+
+      // Extract termination details from the termination letter
+      const terminationReasons = [
+        `Final Performance Score: ${terminatedEmployee.finalScore}%`,
+        `Final Utilization Rate: ${terminatedEmployee.finalUtilization}%`,
+        terminatedEmployee.terminationReason,
+        "Failed to meet minimum performance standards despite coaching opportunities",
+        "Consistently scored below company thresholds for consecutive evaluation periods"
+      ];
+
+      // Generate PDF on demand
+      const pdfPath = await generateTerminationPDF(
+        terminatedEmployee.employeeName,
+        employeeId,
+        employee.role || "Employee",
+        terminatedEmployee.finalScore || 0,
+        terminatedEmployee.finalUtilization || 0,
+        terminationReasons,
+        terminatedEmployee.terminationDate
+      );
+
+      const pdfBuffer = fs.readFileSync(pdfPath);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${terminatedEmployee.employeeName.replace(/\s+/g, '_')}_Termination_Letter.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('Error generating termination PDF:', error);
+      res.status(500).json({ error: "Failed to generate termination PDF" });
+    }
+  });
+
   // Auto-firing demonstration endpoint
   app.post("/api/auto-fire/demo", async (req, res) => {
     try {
@@ -795,17 +928,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employees = await storage.getAllEmployees();
       const metrics = await storage.getAllPerformanceMetrics();
       const terminated = [];
+      const debugInfo = [];
 
       // Find employees with consistently poor performance OR utilization
       console.log(`Evaluating ${employees.length} employees with thresholds: score < ${settings.minScoreThreshold}%, utilization < ${settings.minUtilizationThreshold}%`);
+      console.log(`Requiring ${settings.consecutiveLowPeriods} consecutive low periods`);
       
       for (const employee of employees) {
-        if (employee.status !== 'active') continue;
+        if (employee.status !== 'active' && employee.status !== 'pip') {
+          console.log(`Skipping ${employee.name} (${employee.id}) - status: ${employee.status}`);
+          continue;
+        }
+
+        // Special focus on our problem employees for debugging
+        const isTestEmployee = ['emp-003', 'emp-005', 'emp-007'].includes(employee.id);
+        if (isTestEmployee) {
+          console.log(`\n=== DEBUGGING ${employee.name} (${employee.id}) ===`);
+          console.log(`Status: ${employee.status}`);
+        }
 
         const employeeMetrics = metrics
           .filter(m => m.employeeId === employee.id)
           .sort((a, b) => b.period - a.period)
           .slice(0, settings.consecutiveLowPeriods);
+
+        if (isTestEmployee || employeeMetrics.length >= settings.consecutiveLowPeriods) {
+          console.log(`Employee ${employee.name} (${employee.id}) has ${employeeMetrics.length} recent metrics`);
+        }
 
         if (employeeMetrics.length >= settings.consecutiveLowPeriods) {
           const allLowPerformance = employeeMetrics.every(m => 
@@ -813,9 +962,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             m.utilization < settings.minUtilizationThreshold
           );
           
-          // Debug logging
-          if (employeeMetrics.some(m => m.score < settings.minScoreThreshold || m.utilization < settings.minUtilizationThreshold)) {
-            console.log(`Employee ${employee.id} has some low metrics:`, employeeMetrics.map(m => `Score: ${m.score}%, Util: ${m.utilization}%`));
+          // Debug logging for test employees or employees with some low metrics
+          if (isTestEmployee || employeeMetrics.some(m => m.score < settings.minScoreThreshold || m.utilization < settings.minUtilizationThreshold)) {
+            console.log(`${employee.name} (${employee.id}) recent metrics:`, employeeMetrics.map(m => `Score: ${m.score}%, Util: ${m.utilization}%`));
+            console.log(`  - Threshold check: score < ${settings.minScoreThreshold}% OR utilization < ${settings.minUtilizationThreshold}%`);
+            console.log(`  - Individual checks:`, employeeMetrics.map(m => `(Score ${m.score} < 70: ${m.score < 70}) OR (Util ${m.utilization} < 60: ${m.utilization < 60})`));
+            console.log(`  - All periods low: ${allLowPerformance}`);
+            
+            debugInfo.push({
+              employee: employee.name,
+              id: employee.id,
+              status: employee.status,
+              metrics: employeeMetrics.map(m => `Score: ${m.score}%, Util: ${m.utilization}%`),
+              allLowPerformance,
+              shouldTerminate: allLowPerformance
+            });
           }
 
           if (allLowPerformance) {
@@ -895,7 +1056,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: terminated.length > 0 
           ? `Auto-firing completed. ${terminated.length} employee(s) terminated.`
           : "No employees met termination criteria.",
-        terminated
+        terminated,
+        debugInfo: debugInfo.slice(0, 10) // Include debug info for troubleshooting
       });
     } catch (error) {
       console.error('Error in auto-firing:', error);
@@ -1122,7 +1284,7 @@ async function evaluatePIPCandidates() {
   return { results, processed: employees.length };
 }
 
-function generateCoachingFeedback(score: number, employeeName?: string, role?: string): string {
+function generateCoachingFeedback(score: number, employeeName?: string, role?: string, employee?: any): string {
   const currentDate = new Date().toLocaleDateString('en-US', { 
     year: 'numeric', 
     month: 'long', 
@@ -1132,57 +1294,169 @@ function generateCoachingFeedback(score: number, employeeName?: string, role?: s
   const name = employeeName || '[Employee Name]';
   const position = role || '[Position]';
   
+  // Extract personalized context from employee data
+  const backstory = employee?.backstory || '';
+  const recentHistory = employee?.recentHistory || [];
+  const isOnPip = employee?.isOnPip || false;
+  const pipDetails = employee?.pipDetails;
+  const recentPerformance = employee?.recentPerformance || [];
+  const status = employee?.status || 'active';
+  
+  // Generate status-specific context
+  let statusContext = '';
+  if (isOnPip && pipDetails) {
+    statusContext = `
+
+📋 PIP STATUS UPDATE:
+You are currently enrolled in a Performance Improvement Plan (started ${pipDetails.startDate}). This coaching session is part of your structured development program to help you achieve the goals outlined in your PIP.
+
+PIP Goals:
+${pipDetails.goals?.map((goal: string, index: number) => `${index + 1}. ${goal}`).join('\n') || '• Improve overall performance metrics'}
+
+Current PIP Progress: ${pipDetails.progress || 0}% complete
+`;
+  }
+  
+  // Generate performance trend analysis
+  let performanceTrend = '';
+  if (recentPerformance.length >= 2) {
+    const currentScore = recentPerformance[0]?.score || score;
+    const previousScore = recentPerformance[1]?.score || score;
+    const trend = currentScore > previousScore ? 'improving' : currentScore < previousScore ? 'declining' : 'stable';
+    
+    performanceTrend = `
+
+📊 PERFORMANCE TREND ANALYSIS:
+Recent Score History: ${recentPerformance.slice(0, 3).map(m => `${m.score}%`).join(' → ')}
+Current Trend: ${trend.toUpperCase()}
+${trend === 'improving' ? '✅ Positive momentum - keep building on this progress!' : 
+  trend === 'declining' ? '⚠️ Recent decline requires immediate attention and support' : 
+  '➡️ Consistent performance - focus on breakthrough improvements'}
+`;
+  }
+  
+  // Generate contextual insights based on backstory
+  let contextualInsights = '';
+  let personalizedRecommendations = '';
+  let historicalReference = '';
+  
+  if (recentHistory.length > 0) {
+    historicalReference = `
+
+CONTEXT & RECENT DEVELOPMENTS:
+Based on your recent work history, I want to acknowledge:
+${recentHistory.slice(0, 3).map((item, index) => `• ${item}`).join('\n')}
+`;
+  }
+  
+  if (backstory) {
+    if (employee?.name === 'Marcus Johnson') {
+      contextualInsights = `
+PERSONALIZED ASSESSMENT:
+Given your background in transitioning from manual to automated testing, I understand the technical challenges you've been facing. Your dedication is evident through the extra hours you've been putting in, which shows commitment to improvement.`;
+      
+      personalizedRecommendations = `
+• Consider enrolling in intermediate automation testing courses to bridge the knowledge gap
+• Pair with a senior automation engineer for 1-2 hours daily for the next two weeks
+• Focus on mastering one testing framework at a time rather than trying to learn everything
+• Use test case templates to improve consistency in your work
+• Don't hesitate to ask questions - your willingness to learn is an asset`;
+    
+    } else if (employee?.name === 'David Kim') {
+      contextualInsights = `
+PERSONALIZED ASSESSMENT:
+I recognize that you were previously a high-performing analyst whose work influenced major strategic decisions. The recent decline in performance appears to be situational rather than a reflection of your capabilities.`;
+      
+      personalizedRecommendations = `
+• Let's discuss workload adjustments to help you regain focus
+• Consider utilizing our Employee Assistance Program for additional support
+• Work with your manager to prioritize critical tasks during this challenging period
+• Implement structured daily planning to maximize your productive hours
+• Remember that asking for help or extensions shows professional maturity`;
+    
+    } else if (employee?.name === 'Emily Rodriguez') {
+      contextualInsights = `
+PERSONALIZED ASSESSMENT:
+Your creative talents are exceptional, as evidenced by your award-winning campaign work. The challenge appears to be balancing your perfectionist tendencies with consistent delivery timelines.`;
+      
+      personalizedRecommendations = `
+• Implement time-boxed creative sessions to prevent over-polishing
+• Break large projects into smaller milestone deliverables  
+• Use project management tools to track time allocation across tasks
+• Establish "good enough" criteria for routine vs. high-impact projects
+• Leverage your collaborative skills shown in design thinking workshops`;
+    
+    } else if (employee?.name === 'Robert Thompson') {
+      contextualInsights = `
+PERSONALIZED ASSESSMENT:
+I understand you joined with enthusiasm and have been working to adapt to our support systems. Customer service requires balancing speed with quality resolution, which can be challenging to master.`;
+      
+      personalizedRecommendations = `
+• Shadow a top-performing support representative for a full day
+• Create personal templates for common customer issues to improve response time
+• Practice using our CRM system in a test environment during downtime
+• Focus on one improvement area at a time (e.g., response time OR resolution quality)
+• Attend weekly team knowledge-sharing sessions to learn best practices`;
+    }
+  }
+  
   if (score < 60) {
-    return `
-COACHING & DEVELOPMENT COMMUNICATION
-${currentDate}
+    return `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    COACHING & DEVELOPMENT COMMUNICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Date: ${currentDate}
+Employee: ${name}
+Position: ${position}
+Current Performance Score: ${score}%
 
-Dear ${name},
-
-Following our performance review for ${position}, I want to provide you with specific guidance to help you improve your current performance score of ${score}%.
+Dear ${name},${statusContext}${performanceTrend}${historicalReference}${contextualInsights}
 
 CURRENT PERFORMANCE ASSESSMENT:
-Your recent performance indicates areas requiring immediate attention and focused development. This coaching communication outlines specific steps to help you succeed in your role.
+Your recent performance score of ${score}% indicates areas requiring immediate attention and focused development. This coaching communication outlines specific steps to help you succeed in your role.
 
-KEY AREAS FOR IMPROVEMENT:
+┌─ KEY AREAS FOR IMPROVEMENT ─────────────────────────────────┐
 
-1. FUNDAMENTAL SKILLS DEVELOPMENT
+1. 📚 FUNDAMENTAL SKILLS DEVELOPMENT
    • Review core competencies required for your position
    • Complete relevant training modules within the next 2 weeks
    • Schedule 1:1 meetings with your supervisor twice weekly
    • Document questions and challenges for discussion
 
-2. TASK MANAGEMENT & QUALITY
+2. ✅ TASK MANAGEMENT & QUALITY
    • Carefully review all task requirements before beginning work
    • Use checklists to ensure completeness
    • Seek clarification immediately when uncertain
    • Submit work for review before final completion
 
-3. COMMUNICATION & COLLABORATION
+3. 🤝 COMMUNICATION & COLLABORATION
    • Proactively communicate progress and obstacles
    • Participate actively in team meetings
    • Ask for help when needed - this shows initiative, not weakness
    • Provide regular status updates on ongoing projects
 
-IMMEDIATE ACTION PLAN (Next 30 Days):
+└──────────────────────────────────────────────────────────────┘
+
+PERSONALIZED RECOMMENDATIONS:${personalizedRecommendations}
+
+┌─ IMMEDIATE ACTION PLAN (Next 30 Days) ──────────────────────┐
 □ Complete skills assessment with your manager
-□ Enroll in relevant training programs
+□ Enroll in relevant training programs  
 □ Establish daily check-in routine
 □ Set up weekly progress review meetings
 □ Create personal improvement tracking system
+└──────────────────────────────────────────────────────────────┘
 
 RESOURCES AVAILABLE:
-• Online training library access
-• Mentoring program enrollment
-• Department expertise sharing sessions
-• Professional development budget allocation
+🎓 Online training library access
+👥 Mentoring program enrollment
+💡 Department expertise sharing sessions
+💰 Professional development budget allocation
 
 SUCCESS METRICS:
-We will measure improvement through:
-- Weekly performance score tracking
-- Task completion quality assessments
-- Peer feedback collections
-- Self-assessment evaluations
+📊 Weekly performance score tracking
+🎯 Task completion quality assessments
+👂 Peer feedback collections
+📝 Self-assessment evaluations
 
 NEXT STEPS:
 1. Schedule a follow-up meeting within 48 hours
@@ -1194,14 +1468,13 @@ Your development is important to us, and we are committed to providing the suppo
 
 Best regards,
 AI Coaching & Development System
-Automated Performance Management
-`;
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
   } else if (score < 70) {
     return `
 COACHING & DEVELOPMENT COMMUNICATION
 ${currentDate}
 
-Dear ${name},
+Dear ${name},${statusContext}${performanceTrend}${historicalReference}${contextualInsights}
 
 Thank you for your continued efforts in your role as ${position}. Your current performance score of ${score}% shows progress, though there are opportunities for further improvement.
 
@@ -1264,7 +1537,7 @@ Automated Performance Management
 COACHING & DEVELOPMENT COMMUNICATION
 ${currentDate}
 
-Dear ${name},
+Dear ${name},${statusContext}${performanceTrend}${historicalReference}${contextualInsights}
 
 Congratulations on maintaining solid performance in your role as ${position}. Your current score of ${score}% reflects competent execution of your responsibilities with room for excellence.
 
@@ -1330,7 +1603,7 @@ Automated Performance Management
 RECOGNITION & DEVELOPMENT COMMUNICATION
 ${currentDate}
 
-Dear ${name},
+Dear ${name},${statusContext}${performanceTrend}${historicalReference}${contextualInsights}
 
 Outstanding work! Your exceptional performance as ${position} with a score of ${score}% demonstrates your commitment to excellence and significant value to our organization.
 
@@ -1476,7 +1749,16 @@ async function generateSampleData(storage: any) {
       department: "Engineering",
       status: "active",
       managerId: null,
-      companyId: "C001"
+      companyId: "C001",
+      backstory: "Senior developer with 8 years experience, specializing in full-stack development. Started as a junior developer and worked his way up through consistent performance and technical excellence. Known for clean code practices and mentoring junior team members. Recently completed AWS architecture certification.",
+      recentHistory: [
+        "Led successful migration of monolithic architecture to microservices, improving system performance by 40%",
+        "Mentored 4 junior developers, with 3 receiving promotions in the past year",
+        "Delivered critical feature for major client 3 weeks ahead of schedule",
+        "Implemented automated testing framework that reduced deployment bugs by 65%",
+        "Received 'Employee of the Month' recognition for outstanding technical leadership",
+        "Completed advanced DevOps certification and introduced CI/CD best practices to team"
+      ]
     },
     {
       id: "emp-002", 
@@ -1486,7 +1768,16 @@ async function generateSampleData(storage: any) {
       department: "Product",
       status: "active",
       managerId: null,
-      companyId: "C001"
+      companyId: "C001",
+      backstory: "Product management veteran with MBA from top-tier business school. Previously worked at two successful startups before joining current company. Expert in agile methodology and user-centered design. Known for data-driven decision making and cross-functional collaboration.",
+      recentHistory: [
+        "Launched mobile app feature that increased user engagement by 35%",
+        "Successfully coordinated product roadmap across 5 engineering teams", 
+        "Led user research initiative that identified 3 new market opportunities",
+        "Streamlined product development process, reducing time-to-market by 25%",
+        "Presented quarterly business review to executive leadership, securing $2M additional budget",
+        "Established partnership with key client that generated $500K in new revenue"
+      ]
     },
     {
       id: "emp-003",
@@ -1496,7 +1787,16 @@ async function generateSampleData(storage: any) {
       department: "Engineering",
       status: "active",
       managerId: null,
-      companyId: "C001"
+      companyId: "C001",
+      backstory: "Quality assurance specialist who joined the company 3 years ago after completing a career change from manual testing to automation. Has been struggling with the transition to more complex automated testing frameworks and keeping up with rapidly evolving technology stack. Shows dedication but lacks confidence.",
+      recentHistory: [
+        "Completed basic automation training but struggled with advanced selenium concepts",
+        "Missed 2 critical bugs in production that caused customer complaints",
+        "Frequently asks for help on tasks that should be routine for his experience level",
+        "Received feedback about needing to improve attention to detail and test coverage",
+        "Has been working extra hours to catch up but output quality remains inconsistent",
+        "Expressed feeling overwhelmed during recent 1:1 meetings with manager"
+      ]
     },
     {
       id: "emp-004",
@@ -1506,7 +1806,16 @@ async function generateSampleData(storage: any) {
       department: "Design",
       status: "pip",
       managerId: null,
-      companyId: "C002"
+      companyId: "C002",
+      backstory: "Creative designer with strong artistic background but inconsistent delivery. Graduated from prestigious art school with excellent portfolio. Shows bursts of brilliant creativity followed by periods of lower productivity. Works well under pressure but struggles with routine tasks and time management.",
+      recentHistory: [
+        "Created award-winning campaign design that increased brand recognition by 45%",
+        "Missed 3 project deadlines in the past quarter due to perfectionist tendencies",
+        "Delivered exceptional work for high-profile client presentation under tight deadline",
+        "Received mixed feedback on routine design tasks - excellent creativity but inconsistent execution", 
+        "Participated in design thinking workshop and showed strong collaborative skills",
+        "Started PIP program focused on time management and consistent delivery"
+      ]
     },
     {
       id: "emp-005",
@@ -1516,7 +1825,16 @@ async function generateSampleData(storage: any) {
       department: "Data",
       status: "active",
       managerId: null,
-      companyId: "C002"
+      companyId: "C002",
+      backstory: "Data analyst who was previously a high performer but has shown significant decline in recent months. Personal challenges including family health issues have impacted work focus. Strong analytical skills but currently struggling with motivation and consistent output. Was once considered for promotion but performance has declined substantially.",
+      recentHistory: [
+        "Previously delivered comprehensive market analysis that influenced major strategic decisions",
+        "Recent work quality has declined with multiple errors in data interpretation",
+        "Missed several important deadlines for quarterly reporting",
+        "Utilization has dropped significantly due to extended breaks and reduced focus",
+        "Colleagues have noted decreased engagement in team meetings and collaboration",
+        "Manager has expressed concerns about recent performance trend during informal check-ins"
+      ]
     },
     {
       id: "emp-006",
@@ -1526,7 +1844,16 @@ async function generateSampleData(storage: any) {
       department: "Sales",
       status: "terminated",
       managerId: null,
-      companyId: "C003"
+      companyId: "C003",
+      backstory: "Former sales representative who consistently underperformed despite multiple coaching sessions and support. Had difficulty building client relationships and meeting sales targets. Terminated after extended period of poor performance and low activity levels.",
+      recentHistory: [
+        "Failed to meet sales quota for 8 consecutive months",
+        "Received customer complaints about lack of follow-up on inquiries",
+        "Attended sales training workshops but showed minimal improvement",
+        "Had difficulty using CRM system effectively despite multiple training sessions",
+        "Showed low activity levels in prospecting and lead generation",
+        "Terminated due to continued poor performance and low utilization rates"
+      ]
     }
   ];
   
@@ -1536,6 +1863,72 @@ async function generateSampleData(storage: any) {
   const firstNames = ["John", "Jane", "Mike", "Lisa", "Tom", "Amy", "Chris", "Pat", "Sam", "Alex"];
   const lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis"];
   
+  // Templates for generating diverse backstories
+  const backstoryTemplates = {
+    Engineer: [
+      "Full-stack developer with {years} years experience. Specializes in {tech} and has worked on {projects} projects. {personality} Known for {strength} but {weakness}.",
+      "Backend engineer who joined after working at {prevCompany}. Expert in {tech} with focus on {specialty}. {personality} {strength} though sometimes {weakness}.",
+      "Frontend specialist with strong {skill} background. {experience} {personality} Colleagues appreciate {strength} but note {weakness}."
+    ],
+    Manager: [
+      "Team lead with {years} years in management. Previously {background}. {personality} Team members value {strength} but feedback shows {weakness}.",
+      "Department manager who {background}. Expert in {skill} and {specialty}. {personality} Known for {strength} while working on {weakness}.",
+      "Operations manager with {experience}. Focuses on {specialty} and {tech}. {personality} Staff appreciate {strength} though {weakness}."
+    ],
+    Analyst: [
+      "Data analyst specializing in {specialty} with {years} years experience. {background} {personality} Produces {strength} but {weakness}.",
+      "Business analyst who {experience}. Expert in {tech} and {skill}. {personality} Known for {strength} while {weakness}.",
+      "Research analyst with {background}. Focuses on {specialty} using {tech}. {personality} Delivers {strength} though {weakness}."
+    ],
+    Designer: [
+      "Creative designer with {years} years experience in {specialty}. {background} {personality} Creates {strength} but {weakness}.",
+      "UX/UI designer who {experience}. Specializes in {tech} and {skill}. {personality} Known for {strength} while {weakness}.",
+      "Visual designer with {background}. Expert in {specialty} and {skill}. {personality} Produces {strength} though {weakness}."
+    ],
+    Sales: [
+      "Sales representative with {years} years in {specialty}. {background} {personality} Achieves {strength} but {weakness}.",
+      "Account manager who {experience}. Focuses on {skill} and {specialty}. {personality} Known for {strength} while {weakness}.",
+      "Business development specialist with {background}. Expert in {specialty} using {tech}. {personality} Delivers {strength} though {weakness}."
+    ],
+    Support: [
+      "Customer support specialist with {years} years experience. {background} {personality} Provides {strength} but {weakness}.",
+      "Technical support engineer who {experience}. Expert in {tech} and {skill}. {personality} Known for {strength} while {weakness}.",
+      "Help desk analyst with {background}. Specializes in {specialty} and {skill}. {personality} Delivers {strength} though {weakness}."
+    ],
+    Marketing: [
+      "Marketing specialist with {years} years in {specialty}. {background} {personality} Creates {strength} but {weakness}.",
+      "Digital marketer who {experience}. Expert in {tech} and {skill}. {personality} Known for {strength} while {weakness}.",
+      "Brand manager with {background}. Focuses on {specialty} and {tech}. {personality} Produces {strength} though {weakness}."
+    ]
+  };
+
+  const variables = {
+    years: ["2", "3", "4", "5", "6", "7", "8", "10"],
+    tech: ["React", "Python", "SQL", "JavaScript", "AWS", "Docker", "Kubernetes", "Node.js", "GraphQL", "MongoDB"],
+    projects: ["mobile", "web", "enterprise", "e-commerce", "fintech", "healthcare", "SaaS", "analytics"],
+    personality: ["Collaborative team player.", "Detail-oriented individual.", "Results-driven professional.", "Creative problem solver.", "Process-oriented worker.", "Innovation-focused contributor."],
+    strength: ["high-quality deliverables", "meeting tight deadlines", "clear communication", "technical expertise", "mentoring others", "process improvement", "client relationships", "analytical thinking"],
+    weakness: ["struggles with time management", "needs improvement in documentation", "could benefit from more proactive communication", "working on consistency", "developing leadership skills", "improving work-life balance", "could enhance collaboration", "building confidence"],
+    prevCompany: ["a startup", "a Fortune 500 company", "a consulting firm", "a tech company", "a government agency", "a non-profit"],
+    specialty: ["system architecture", "data visualization", "user experience", "performance optimization", "security", "automation", "client relations", "market analysis"],
+    skill: ["project management", "agile methodology", "stakeholder communication", "requirements gathering", "quality assurance", "team leadership"],
+    experience: ["transitioned from technical role to management", "started as intern and worked up", "brought extensive industry knowledge", "joined after career change", "promoted from within"],
+    background: ["graduated from top university", "completed professional certification", "worked in multiple industries", "has military background", "self-taught professional", "has startup experience"]
+  };
+
+  const historyTemplates = [
+    "Successfully completed {project} project {timeframe}",
+    "Received {recognition} for {achievement}",
+    "Led initiative that {result}",
+    "Struggled with {challenge} but showed {improvement}",
+    "Collaborated on {project} with {outcome}",
+    "Attended {training} and applied {skill}",
+    "Mentored {number} team members in {area}",
+    "Identified and resolved {problem}",
+    "Missed {deadline} due to {reason}",
+    "Exceeded expectations in {area}"
+  ];
+
   for (let i = 7; i <= 1000; i++) {
     const companyId = companies[Math.floor(Math.random() * companies.length)];
     const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
@@ -1546,6 +1939,52 @@ async function generateSampleData(storage: any) {
     // Make first 50 additional employees PIP candidates
     const isPipCandidate = i >= 7 && i <= 56;
     
+    // Generate backstory
+    const templates = backstoryTemplates[role] || backstoryTemplates.Engineer;
+    let backstory = templates[Math.floor(Math.random() * templates.length)];
+    
+    // Replace variables in backstory
+    Object.entries(variables).forEach(([key, values]) => {
+      const regex = new RegExp(`{${key}}`, 'g');
+      if (backstory.includes(`{${key}}`)) {
+        backstory = backstory.replace(regex, values[Math.floor(Math.random() * values.length)]);
+      }
+    });
+
+    // Generate 5-7 recent history items
+    const historyCount = Math.floor(Math.random() * 3) + 5; // 5-7 items
+    const recentHistory = [];
+    for (let h = 0; h < historyCount; h++) {
+      let historyItem = historyTemplates[Math.floor(Math.random() * historyTemplates.length)];
+      
+      // Replace placeholders
+      const replacements = {
+        project: ["mobile app", "dashboard redesign", "API integration", "database migration", "client presentation", "training program"],
+        timeframe: ["last quarter", "this month", "3 months ago", "earlier this year", "in Q2", "during peak season"],
+        recognition: ["positive feedback", "team award", "client commendation", "performance bonus", "peer nomination", "leadership recognition"],
+        achievement: ["exceeding targets", "technical innovation", "process improvement", "mentoring success", "quality delivery", "customer satisfaction"],
+        result: ["improved efficiency by 25%", "reduced costs", "increased customer satisfaction", "streamlined processes", "enhanced team collaboration", "delivered ahead of schedule"],
+        challenge: ["tight deadlines", "technical complexity", "resource constraints", "shifting requirements", "team coordination", "learning new technology"],
+        improvement: ["additional training", "process adjustments", "better planning", "enhanced collaboration", "skill development", "time management"],
+        outcome: ["positive client feedback", "successful delivery", "improved metrics", "team recognition", "process optimization", "enhanced user experience"],
+        training: ["technical workshop", "leadership seminar", "certification course", "skills bootcamp", "industry conference", "online training"],
+        number: ["2", "3", "4", "several", "multiple"],
+        area: ["technical skills", "project management", "client relations", "problem-solving", "industry knowledge", "best practices"],
+        problem: ["system bottleneck", "communication gap", "workflow inefficiency", "quality issue", "resource conflict", "technical debt"],
+        deadline: ["project deadline", "quarterly goal", "client deliverable", "milestone target", "reporting deadline", "launch schedule"],
+        reason: ["competing priorities", "resource constraints", "technical challenges", "external dependencies", "scope changes", "unforeseen complexity"]
+      };
+      
+      Object.entries(replacements).forEach(([key, values]) => {
+        const regex = new RegExp(`{${key}}`, 'g');
+        if (historyItem.includes(`{${key}}`)) {
+          historyItem = historyItem.replace(regex, values[Math.floor(Math.random() * values.length)]);
+        }
+      });
+      
+      recentHistory.push(historyItem);
+    }
+    
     const employee = {
       id: `emp-${i.toString().padStart(3, '0')}`,
       name: `${firstName} ${lastName}`,
@@ -1554,7 +1993,9 @@ async function generateSampleData(storage: any) {
       department,
       status: isPipCandidate ? "pip" : "active",
       managerId: null,
-      companyId
+      companyId,
+      backstory,
+      recentHistory
     };
     
     employees.push(employee);
@@ -1604,11 +2045,14 @@ async function generateSampleData(storage: any) {
 
   // Marcus Johnson - Struggling performer (should be terminated)
   for (let i = 0; i < 12; i++) {
+    // Recent 3 periods (i=0,1,2) should be consistently low for termination
+    const baseScore = i < 3 ? 55 : Math.floor(Math.random() * 15) + 50; 
+    const baseUtilization = i < 3 ? 45 : Math.floor(Math.random() * 12) + 45;
     await storage.createPerformanceMetric({
       employeeId: "emp-003",
       period: currentPeriod - i,
-      score: Math.floor(Math.random() * 15) + 50, // 50-65 (below 70 threshold)
-      utilization: Math.floor(Math.random() * 12) + 45, // 45-57% (always below 60 threshold)
+      score: i < 3 ? Math.floor(Math.random() * 5) + baseScore : Math.floor(Math.random() * 15) + 50, // Consistently low recent periods
+      utilization: i < 3 ? Math.floor(Math.random() * 5) + baseUtilization : Math.floor(Math.random() * 12) + 45, // Always below 60 threshold
       tasksCompleted: Math.floor(Math.random() * 3) + 8, // 8-11
       date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
@@ -1629,13 +2073,14 @@ async function generateSampleData(storage: any) {
 
   // David Kim - Severe performance decline (should be terminated)
   for (let i = 0; i < 12; i++) {
-    const baseScore = i < 4 ? 55 : 78; // Recent severe decline
-    const baseUtilization = i < 4 ? 45 : 75; // Severe utilization drop
+    // Recent 3 periods (i=0,1,2) should be consistently low for termination
+    const baseScore = i < 3 ? 55 : 78; // Recent severe decline
+    const baseUtilization = i < 3 ? 45 : 75; // Severe utilization drop
     await storage.createPerformanceMetric({
       employeeId: "emp-005",
       period: currentPeriod - i,
-      score: Math.floor(Math.random() * 8) + baseScore,
-      utilization: Math.floor(Math.random() * 8) + baseUtilization,
+      score: i < 3 ? Math.floor(Math.random() * 5) + baseScore : Math.floor(Math.random() * 8) + baseScore,
+      utilization: i < 3 ? Math.floor(Math.random() * 5) + baseUtilization : Math.floor(Math.random() * 8) + baseUtilization,
       tasksCompleted: Math.floor(Math.random() * 3) + 13,
       date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     });
@@ -1668,6 +2113,40 @@ async function generateSampleData(storage: any) {
     finalScore: 41,
     finalUtilization: 32
   });
+
+  // Create another poor performer to guarantee terminations
+  await storage.createEmployee({
+    id: "emp-007",
+    name: "Robert Thompson",
+    role: "Customer Support Rep",
+    department: "Support",
+    companyId: `company-${Math.floor(Math.random() * 200) + 1}`,
+    status: "active",
+    backstory: "Customer support representative who has struggled to adapt to new support systems and procedures. Joined the company 2 years ago with enthusiasm but has shown consistent difficulty in meeting performance metrics. Receives frequent customer complaints about slow response times and inadequate problem resolution.",
+    recentHistory: [
+      "Consistently scores below average in customer satisfaction surveys",
+      "Takes significantly longer than team average to resolve support tickets",
+      "Has received multiple coaching sessions on communication and technical skills",
+      "Frequently misses daily activity targets for ticket resolution",
+      "Shows low engagement during team meetings and training sessions",
+      "Customer complaints have increased 40% for tickets he handles compared to team average"
+    ]
+  });
+
+  // Robert Thompson - Consistently poor performer (should definitely be terminated)
+  for (let i = 0; i < 12; i++) {
+    // Ensure recent 3 periods are consistently low
+    const baseScore = 45;
+    const baseUtilization = 35;
+    await storage.createPerformanceMetric({
+      employeeId: "emp-007",
+      period: currentPeriod - i,
+      score: i < 3 ? Math.floor(Math.random() * 5) + baseScore : Math.floor(Math.random() * 10) + 45, // Consistently low recent 3 periods
+      utilization: i < 3 ? Math.floor(Math.random() * 5) + baseUtilization : Math.floor(Math.random() * 10) + 35, // Always below thresholds  
+      tasksCompleted: Math.floor(Math.random() * 3) + 6, // 6-9
+      date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    });
+  }
 
   // Create sample PIPs (create for Emily who has inconsistent performance)
   const pipStartDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -1813,6 +2292,58 @@ async function generateSampleData(storage: any) {
         score: isHighPerformer ? Math.floor(Math.random() * 20) + 75 : Math.floor(Math.random() * 25) + 45,
         utilization: isHighPerformer ? Math.floor(Math.random() * 15) + 75 : Math.floor(Math.random() * 20) + 40,
         tasksCompleted: Math.floor(Math.random() * 10) + 10,
+        date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      });
+    }
+  }
+  
+  // Create 3 fresh poor performers for auto-fire demo (always active with consistently poor recent performance)
+  const poorPerformerIds = ['emp-995', 'emp-996', 'emp-997'];
+  const poorPerformerData = [
+    { name: 'Jake Wilson', role: 'Support Rep', dept: 'Support' },
+    { name: 'Sam Martinez', role: 'QA Tester', dept: 'Engineering' },
+    { name: 'Taylor Brown', role: 'Data Entry', dept: 'Operations' }
+  ];
+  
+  for (let idx = 0; idx < poorPerformerIds.length; idx++) {
+    const empId = poorPerformerIds[idx];
+    const data = poorPerformerData[idx];
+    
+    // Create the employee as active
+    await storage.createEmployee({
+      id: empId,
+      name: data.name,
+      role: data.role,
+      email: `${data.name.toLowerCase().replace(' ', '.')}@company.com`,
+      department: data.dept,
+      companyId: companies[Math.floor(Math.random() * companies.length)],
+      status: "active",
+      backstory: `Employee with recent performance challenges that require immediate attention. Consistently scoring below minimum thresholds.`,
+      recentHistory: [
+        "Performance has declined significantly in recent weeks",
+        "Missing daily activity targets consistently",
+        "Receiving feedback about work quality concerns",
+        "Low engagement in team activities",
+        "Struggling to meet basic job requirements"
+      ]
+    });
+    
+    // Create consistently poor recent performance (last 3-4 periods all below thresholds)
+    for (let i = 0; i < 6; i++) {
+      const isRecentPeriod = i < 4; // Recent 4 periods are consistently poor
+      const score = isRecentPeriod 
+        ? Math.floor(Math.random() * 15) + 45  // 45-60 (below 70 threshold)
+        : Math.floor(Math.random() * 25) + 60; // 60-85 (mixed older performance)
+      const utilization = isRecentPeriod
+        ? Math.floor(Math.random() * 15) + 35  // 35-50 (below 60 threshold)
+        : Math.floor(Math.random() * 20) + 55; // 55-75 (mixed older performance)
+        
+      await storage.createPerformanceMetric({
+        employeeId: empId,
+        period: metricsCurrentPeriod - i,
+        score,
+        utilization,
+        tasksCompleted: Math.floor(Math.random() * 5) + 5, // 5-10 (low)
         date: new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
       });
     }

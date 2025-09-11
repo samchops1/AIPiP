@@ -6,6 +6,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import CoachingFeedbackModal from "@/components/modals/coaching-feedback-modal";
+import { useState } from "react";
 import { 
   Plus, 
   Calendar, 
@@ -24,6 +26,9 @@ export default function PipCards({ pips, isLoading }: PipCardsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  const [showCoachingModal, setShowCoachingModal] = useState(false);
+  const [coachingEmployee, setCoachingEmployee] = useState<any>(null);
+  const [coachingFeedback, setCoachingFeedback] = useState('');
 
   const generateCoachingMutation = useMutation({
     mutationFn: async ({ employeeId, score, pipId }: any) => {
@@ -34,11 +39,21 @@ export default function PipCards({ pips, isLoading }: PipCardsProps) {
       });
       return response.json();
     },
-    onSuccess: () => {
-      toast({
-        title: "Coaching Generated",
-        description: "Automated coaching feedback has been sent.",
-      });
+    onSuccess: (data, { employeeId, score, pipId }) => {
+      // Find the employee data
+      const pipData = pips?.find(p => p.id === pipId);
+      const employee = {
+        id: employeeId,
+        name: pipData?.employeeName || `Employee ${employeeId}`,
+        role: pipData?.role || 'Employee',
+        score,
+        pipId
+      };
+      
+      setCoachingEmployee(employee);
+      setCoachingFeedback(data.feedback || 'Coaching feedback generated successfully.');
+      setShowCoachingModal(true);
+      
       queryClient.invalidateQueries({ queryKey: ['/api/coaching-sessions'] });
     },
     onError: (error: any) => {
@@ -97,6 +112,7 @@ export default function PipCards({ pips, isLoading }: PipCardsProps) {
   }
 
   return (
+    <>
     <Card className="mt-8">
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -239,5 +255,16 @@ export default function PipCards({ pips, isLoading }: PipCardsProps) {
         )}
       </CardContent>
     </Card>
+    
+    {/* Coaching Feedback Modal */}
+    {coachingEmployee && (
+      <CoachingFeedbackModal
+        isOpen={showCoachingModal}
+        onClose={() => setShowCoachingModal(false)}
+        employee={coachingEmployee}
+        feedback={coachingFeedback}
+      />
+    )}
+    </>
   );
 }

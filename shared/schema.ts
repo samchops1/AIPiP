@@ -12,6 +12,8 @@ export const employees = pgTable("employees", {
   managerId: varchar("manager_id"),
   companyId: varchar("company_id"),
   status: text("status").notNull().default("active"), // active, pip, terminated
+  backstory: text("backstory"), // Employee's background and context
+  recentHistory: jsonb("recent_history"), // Array of recent notable events/achievements
   createdAt: timestamp("created_at").default(sql`now()`),
   updatedAt: timestamp("updated_at").default(sql`now()`)
 });

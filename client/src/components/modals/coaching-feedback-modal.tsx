@@ -217,8 +217,29 @@ export default function CoachingFeedbackModal({
                   {getCoachingIcon(employee.score)}
                   <h4 className="font-semibold">Coaching Feedback Generated</h4>
                 </div>
-                <div className="bg-accent/5 border border-accent/20 rounded-lg p-4">
-                  <p className="text-sm leading-relaxed">{feedback}</p>
+                <div className="bg-accent/5 border border-accent/20 rounded-lg p-4 max-h-96 overflow-y-auto">
+                  <div 
+                    className="text-sm leading-relaxed whitespace-pre-line font-mono"
+                    dangerouslySetInnerHTML={{
+                      __html: feedback
+                        .replace(/\n\n/g, '<br><br>')
+                        .replace(/\n/g, '<br>')
+                        .replace(/COACHING & DEVELOPMENT COMMUNICATION/g, '<strong>COACHING & DEVELOPMENT COMMUNICATION</strong>')
+                        .replace(/PERFORMANCE OVERVIEW:/g, '<strong>PERFORMANCE OVERVIEW:</strong>')
+                        .replace(/AREAS OF STRENGTH:/g, '<strong>AREAS OF STRENGTH:</strong>')
+                        .replace(/FOCUS AREAS FOR IMPROVEMENT:/g, '<strong>FOCUS AREAS FOR IMPROVEMENT:</strong>')
+                        .replace(/SPECIFIC RECOMMENDATIONS:/g, '<strong>SPECIFIC RECOMMENDATIONS:</strong>')
+                        .replace(/NEXT STEPS:/g, '<strong>NEXT STEPS:</strong>')
+                        .replace(/RECOGNITION & DEVELOPMENT COMMUNICATION/g, '<strong>RECOGNITION & DEVELOPMENT COMMUNICATION</strong>')
+                        .replace(/PERFORMANCE RECOGNITION:/g, '<strong>PERFORMANCE RECOGNITION:</strong>')
+                        .replace(/EXCEPTIONAL STRENGTHS:/g, '<strong>EXCEPTIONAL STRENGTHS:</strong>')
+                        .replace(/LEADERSHIP & MENTORING OPPORTUNITIES:/g, '<strong>LEADERSHIP & MENTORING OPPORTUNITIES:</strong>')
+                        .replace(/EXCELLENCE CONTINUATION PLAN:/g, '<strong>EXCELLENCE CONTINUATION PLAN:</strong>')
+                        .replace(/⭐/g, '<span style="color: #fbbf24;">⭐</span>')
+                        .replace(/□/g, '<span style="color: #6366f1;">□</span>')
+                        .replace(/•/g, '<span style="color: #06b6d4;">•</span>')
+                    }}
+                  />
                 </div>
               </div>
               

@@ -4,7 +4,12 @@
       "Bash(npm run build:*)",
       "Bash(npm run typecheck:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(lsof:*)",
+      "Bash(pkill:*)",
+      "Read(//dev/**)"
     ],
     "deny": [],
     "ask": []
