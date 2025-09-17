@@ -2,20 +2,25 @@ import type { Request, Response } from "express";
 import { storage } from "./storage";
 
 export async function weeklyFairnessReport(_req: Request, res: Response) {
-  const pips = await storage.getAllPips?.();
-  const terms = await storage.getTerminatedEmployees?.();
-  const employees = await storage.getAllEmployees?.();
+  const pips = await storage.getAllPips();
+  const terms = await storage.getTerminatedEmployees();
+  const employees = await storage.getAllEmployees();
 
-  const cohort = (id: string) =>
-    (parseInt(id.slice(-2), 16) % 2 === 0 ? "A" : "B");
+  const cohort = (id: string) => (parseInt(id.slice(-2), 16) % 2 === 0 ? "A" : "B");
 
   const by = (arr: any[], keyFn: (x: any) => string) =>
     arr.reduce((m, x) => ((m[keyFn(x)] ??= []).push(x), m), {} as Record<string, any[]>);
 
-  // Count unique employees proposed for PIP to avoid inflating counts when multiple PIPs exist
-  const pipEmpIds = Array.from(new Set((pips || []).map((p: any) => p.employeeId))).map(id => ({ employeeId: id }));
-  const pByC = by(pipEmpIds, (p: any) => cohort(p.employeeId));
-  const tByC = by(terms || [], (t: any) => cohort(t.employeeId));
+  // Build unique employee-level counts for PIPs and Terminations
+  const uniquePipEmpIds = Array.from(new Set((pips || []).map((p: any) => p.employeeId)));
+  const pipEmpObjs = uniquePipEmpIds.map(id => ({ employeeId: id }));
+  const pByC = by(pipEmpObjs, (p: any) => cohort(p.employeeId));
+
+  const termIdsFromRecords = new Set((terms || []).map((t: any) => t.employeeId));
+  const termIdsFromStatus = new Set((employees || []).filter((e: any) => e.status === 'terminated').map((e: any) => e.id));
+  const combinedTermIds = new Set<string>([...termIdsFromRecords, ...termIdsFromStatus]);
+  const termEmpObjs = Array.from(combinedTermIds).map(id => ({ employeeId: id }));
+  const tByC = by(termEmpObjs, (t: any) => cohort(t.employeeId));
   const eByC = by(employees || [], (e: any) => cohort(e.id));
 
   const report = ["A", "B"].map((c) => {
@@ -29,7 +34,8 @@ export async function weeklyFairnessReport(_req: Request, res: Response) {
 
   res.json({
     generatedAt: new Date().toISOString(),
-    methodology: "Synthetic cohorts (A/B) are assigned deterministically by employeeId suffix to illustrate fairness monitoring without sensitive attributes. Rates are normalized by cohort population.",
+    methodology:
+      "Synthetic cohorts (A/B) are assigned deterministically by employeeId suffix to illustrate fairness monitoring without sensitive attributes. Rates are normalized by cohort population.",
     report,
   });
 }

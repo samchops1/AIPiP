@@ -62,7 +62,7 @@ The app enforces roles server‑side and also hides/guards HR‑only UI actions.
   - Employees already on a PIP who continue to fail can be terminated. Termination letters and audit entries are generated.
 - Legal/HR gate is enforced at API layer (e.g., for programmatic usage when applicable).
 
-5) Govern and analyze
+5) Govern and analyze (check twice)
 - Analytics tabs provide:
   - Performance Distribution: mix of Excellent/Good/Average/Poor.
   - Departments & Companies: structure and risk concentration by org.
@@ -70,6 +70,11 @@ The app enforces roles server‑side and also hides/guards HR‑only UI actions.
   - Utilization Analysis: High/Medium/Low distribution.
   - Financial: investment, savings, ROI with editable assumptions; export JSON/CSV.
   - Improvement Rate baseline: the dashboard snapshots a pre‑offboarding improvement rate baseline when you click Execute Auto‑Firing. Post‑offboarding, the card shows delta vs this baseline (e.g., “−6% vs baseline”).
+  - Fairness Snapshot: review PIP and termination rates across cohorts.
+
+Recommended cadence for the demo:
+- Check Analytics once immediately after generating sample data (baseline state).
+- Run Auto‑Firing (HR only) and then return to Analytics to compare before/after (rates, distributions, ROI, and Fairness Snapshot).
 - Audit Logs: verify all actions with timestamps and entities.
 - Settings → Kill Switch: emergency pause of automated workflows.
 

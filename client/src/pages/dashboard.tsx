@@ -67,6 +67,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/performance-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['/api/pips'] });
       queryClient.invalidateQueries({ queryKey: ['/api/audit-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/reports/fairness/weekly'] });
       toast({
         title: 'Sample data generated',
         description: 'Created 1000+ employees with realistic performance patterns'
@@ -137,6 +138,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/terminated-employees'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['/api/audit-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/reports/fairness/weekly'] });
     },
     onError: () => {
       toast({
