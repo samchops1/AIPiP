@@ -19,6 +19,8 @@ import {
   generatePIPPDF,
   generateBulkPerformanceReportPDF 
 } from "./pdfGenerator";
+import { requireRole, requireNotDryRun } from "./auth";
+import { assertTransition } from "./fsm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -44,7 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/employees", async (req, res) => {
+  app.post("/api/employees", requireRole("manager"), async (req, res) => {
     try {
       const validatedData = insertEmployeeSchema.parse(req.body);
       const employee = await storage.createEmployee(validatedData);
@@ -82,7 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/performance-metrics", async (req, res) => {
+  app.post("/api/performance-metrics", requireRole("manager"), async (req, res) => {
     try {
       const validatedData = insertPerformanceMetricSchema.parse(req.body);
       const metric = await storage.createPerformanceMetric(validatedData);
@@ -104,7 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CSV upload route
-  app.post("/api/upload-csv", async (req, res) => {
+  app.post("/api/upload-csv", requireRole("manager"), async (req, res) => {
     try {
       const validatedData = csvUploadSchema.parse(req.body);
       
@@ -183,7 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/pips", async (req, res) => {
+  app.post("/api/pips", requireRole("manager"), async (req, res) => {
     try {
       const validatedData = insertPipSchema.parse(req.body);
       const pip = await storage.createPip(validatedData);
@@ -207,8 +209,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/pips/:id", async (req, res) => {
+  app.put("/api/pips/:id", requireRole("manager"), async (req, res) => {
     try {
+      const current = await storage.getPipById(req.params.id);
+      if (!current) {
+        return res.status(404).json({ error: "PIP not found" });
+      }
+
+      // Enforce FSM on status changes
+      if (typeof req.body?.status === "string") {
+        try {
+          assertTransition((current.status as any) || "active", req.body.status);
+        } catch (e: any) {
+          return res.status(e.status || 409).json({ error: "illegal_transition", message: e.message });
+        }
+      }
+
       const pip = await storage.updatePip(req.params.id, req.body);
       if (!pip) {
         return res.status(404).json({ error: "PIP not found" });
@@ -305,7 +321,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PIP evaluation endpoint
-  app.post("/api/evaluate-pips", async (req, res) => {
+  app.post("/api/evaluate-pips", requireRole("manager"), async (req, res) => {
     try {
       const results = await evaluatePIPCandidates();
       res.json(results);
@@ -315,7 +331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate coaching endpoint
-  app.post("/api/generate-coaching", async (req, res) => {
+  app.post("/api/generate-coaching", requireRole("manager"), async (req, res) => {
     try {
       const { employeeId, score, pipId } = req.body;
       
@@ -914,7 +930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Auto-firing demonstration endpoint
-  app.post("/api/auto-fire/demo", async (req, res) => {
+  app.post("/api/auto-fire/demo", requireRole("manager", "hr"), requireNotDryRun, async (req, res) => {
     try {
       const settings = await storage.getSystemSettings();
       
@@ -1129,8 +1145,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Auto-firing evaluation endpoint
-  app.post('/api/evaluate-terminations', async (req, res) => {
+  app.post('/api/evaluate-terminations', requireRole("manager", "hr"), requireNotDryRun, async (req, res) => {
     try {
+      // Legal/HR gate
+      const { legal_signoff, hr_signoff, risk_flags = [] } = req.body || {};
+      const blockFlags = new Set(["protected_class", "ongoing_leave", "whistleblower"]);
+      const hasRisk = Array.isArray(risk_flags) && (risk_flags as string[]).some((f) => blockFlags.has(f));
+
+      if (!legal_signoff || !hr_signoff) {
+        return res.status(409).json({ error: "missing_signoff" });
+      }
+      if (hasRisk) {
+        return res.status(409).json({ error: "risk_requires_hold", risk_flags });
+      }
+
       const results = await evaluateTerminationCandidates();
       res.json(results);
     } catch (error) {
@@ -2422,7 +2450,8 @@ async function evaluateTerminationCandidates() {
         ((pip.currentScore - pip.initialScore) / pip.initialScore * 100) >= pip.improvementRequired;
 
       if (!improvementMet) {
-        // Terminate employee
+        // Terminate employee (FSM: active -> terminated)
+        try { assertTransition((pip.status as any) || "active", "terminated"); } catch (e: any) { return { error: "illegal_transition", message: e.message }; }
         await storage.updateEmployee(pip.employeeId, { status: "terminated" });
         await storage.updatePip(pip.id, { status: "terminated" });
 
@@ -2445,7 +2474,8 @@ async function evaluateTerminationCandidates() {
           reason: "Failed to meet PIP requirements"
         });
       } else {
-        // PIP completed successfully
+        // PIP completed successfully (FSM: active -> completed)
+        try { assertTransition((pip.status as any) || "active", "completed"); } catch (e: any) { return { error: "illegal_transition", message: e.message }; }
         await storage.updateEmployee(pip.employeeId, { status: "active" });
         await storage.updatePip(pip.id, { status: "completed" });
 
