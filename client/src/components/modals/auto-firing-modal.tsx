@@ -285,7 +285,7 @@ export default function AutoFiringModal({
 
           {/* Action Buttons */}
           <div className="flex justify-end space-x-2 pt-4 border-t">
-            {currentStep === steps.length - 1 && (
+            {showResults && (
               <Button onClick={onClose} data-testid="button-close-auto-firing">
                 Close
               </Button>

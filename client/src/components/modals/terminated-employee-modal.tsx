@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Download, Calendar, User, AlertTriangle, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import jsPDF from 'jspdf';
 
 interface TerminatedEmployeeModalProps {
   isOpen: boolean;
@@ -28,30 +29,32 @@ export default function TerminatedEmployeeModal({
 
   if (!employee) return null;
 
-  const handleDownloadPDF = async () => {
+  const handleDownloadPDF = () => {
     try {
-      const response = await fetch(`/api/employees/${employee.employeeId}/termination-pdf`);
-      if (!response.ok) throw new Error('Failed to download PDF');
+      const doc = new jsPDF();
       
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `${employee.employeeName.replace(/\s+/g, '_')}_Termination_Letter.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      // Set title
+      doc.setFontSize(16);
+      doc.text('EMPLOYMENT TERMINATION NOTICE', 20, 20);
+      
+      // Set content - use the termination letter from the employee data
+      doc.setFontSize(11);
+      const lines = doc.splitTextToSize(employee.terminationLetter, 170);
+      doc.text(lines, 20, 40);
+      
+      // Download the PDF
+      const fileName = `${employee.employeeName.replace(/\s+/g, '_')}_Termination_Letter.pdf`;
+      doc.save(fileName);
       
       toast({
         title: "PDF Downloaded",
         description: "Termination letter PDF has been downloaded successfully.",
       });
     } catch (error) {
+      console.error('PDF generation failed:', error);
       toast({
         title: "Download Failed",
-        description: "Failed to download termination letter PDF.",
+        description: "Failed to generate termination letter PDF.",
         variant: "destructive",
       });
     }

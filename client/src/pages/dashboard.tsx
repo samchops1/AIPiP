@@ -86,8 +86,10 @@ export default function Dashboard() {
 
   const autoFireMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/auto-fire/demo'),
-    onSuccess: (data: any) => {
-      setTerminatedEmployeesData(data.terminated || []);
+    onSuccess: async (data: any) => {
+      // Fetch all terminated employees to show in modal, not just newly terminated ones
+      const allTerminated = await apiRequest('GET', '/api/terminated-employees');
+      setTerminatedEmployeesData(allTerminated || []);
       setShowAutoFiringModal(true);
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
       queryClient.invalidateQueries({ queryKey: ['/api/terminated-employees'] });
