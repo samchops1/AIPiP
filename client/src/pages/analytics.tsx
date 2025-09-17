@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, Legend } from 'recharts';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -40,31 +41,46 @@ export default function Analytics() {
 
   const { data: employees } = useQuery({
     queryKey: ['/api/employees'],
+    refetchOnMount: 'always',
   });
 
   const { data: metrics } = useQuery({
     queryKey: ['/api/performance-metrics'],
+    refetchOnMount: 'always',
   });
 
   const { data: pips } = useQuery({
     queryKey: ['/api/pips'],
+    refetchOnMount: 'always',
   });
 
   const { data: terminatedEmployees } = useQuery({
     queryKey: ['/api/terminated-employees'],
+    refetchOnMount: 'always',
   });
 
   const { data: dashboardMetrics } = useQuery({
     queryKey: ['/api/dashboard-metrics'],
+    refetchOnMount: 'always',
   });
 
   const { data: coachingSessions } = useQuery({
     queryKey: ['/api/coaching-sessions/all'],
+    refetchOnMount: 'always',
   });
   const automatedSessions = (coachingSessions as any[])?.filter((s: any) => s.type === 'automated') || [];
 
   const { data: fairness } = useQuery({
     queryKey: ['/api/reports/fairness/weekly'],
+    refetchOnMount: 'always',
+  });
+  const { data: fairnessTrend } = useQuery({
+    queryKey: ['/api/reports/fairness/trend'],
+    refetchOnMount: 'always',
+  });
+  const { data: fairnessDetail } = useQuery({
+    queryKey: ['/api/reports/fairness/detail'],
+    refetchOnMount: 'always',
   });
 
   // Client-driven ROI only (server ROI endpoints are demo-only, not used for interview)
@@ -112,14 +128,15 @@ export default function Analytics() {
   };
 
   // Coaching effectiveness
-  const coachingStats = (coachingSessions as any[])?.reduce((acc: any, session: any) => {
-    const score = session.score;
+  const scoredSessions = ((coachingSessions as any[]) || []).filter((s: any) => typeof s.score === 'number');
+  const coachingStats = scoredSessions.reduce((acc: any, session: any) => {
+    const score = session.score as number;
     if (score >= 80) acc.effective++;
     else if (score >= 60) acc.moderate++;
     else acc.ineffective++;
     acc.total++;
     return acc;
-  }, { effective: 0, moderate: 0, ineffective: 0, total: 0 }) || { effective: 0, moderate: 0, ineffective: 0, total: 0 };
+  }, { effective: 0, moderate: 0, ineffective: 0, total: 0 });
 
   // ROI calculations (explicit, adjustable assumptions)
   const avgSalary = Math.max(0, Number(assumptions.avgSalary) || 0);
@@ -412,6 +429,66 @@ export default function Analytics() {
             ) : (
               <div className="text-sm text-muted-foreground">No fairness data yet.</div>
             )}
+
+            {/* Trend sparkline */}
+            {fairnessTrend?.data && fairnessTrend.data.length > 0 && (() => {
+              const trendData = fairnessTrend.data.map((pt: any) => ({
+                week: pt.week,
+                pipA: +(pt.pip_rate_A * 100).toFixed(1),
+                pipB: +(pt.pip_rate_B * 100).toFixed(1),
+                termA: +(pt.term_rate_A * 100).toFixed(1),
+                termB: +(pt.term_rate_B * 100).toFixed(1),
+              }));
+              return (
+                <div className="mt-4 space-y-4">
+                  <div className="text-xs text-muted-foreground">Trend (last 8 weeks)</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="h-48 p-2 bg-muted/30 rounded">
+                      <div className="text-xs font-medium mb-1">PIP Rate</div>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={trendData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                          <XAxis dataKey="week" tick={{ fontSize: 10 }} hide={false} />
+                          <YAxis unit="%" tick={{ fontSize: 10 }} domain={[0, 'dataMax + 2']} />
+                          <RTooltip formatter={(v: any) => [`${v}%`, 'Rate']} />
+                          <Legend wrapperStyle={{ fontSize: 10 }} />
+                          <Line type="monotone" dataKey="pipA" name="Cohort A" stroke="#2563eb" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="pipB" name="Cohort B" stroke="#ef4444" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="h-48 p-2 bg-muted/30 rounded">
+                      <div className="text-xs font-medium mb-1">Termination Rate</div>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={trendData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                          <XAxis dataKey="week" tick={{ fontSize: 10 }} hide={false} />
+                          <YAxis unit="%" tick={{ fontSize: 10 }} domain={[0, 'dataMax + 2']} />
+                          <RTooltip formatter={(v: any) => [`${v}%`, 'Rate']} />
+                          <Legend wrapperStyle={{ fontSize: 10 }} />
+                          <Line type="monotone" dataKey="termA" name="Cohort A" stroke="#2563eb" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="termB" name="Cohort B" stroke="#ef4444" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Raw details for quick inspection */}
+            {fairnessDetail?.detail && (
+              <div className="mt-4 text-xs text-muted-foreground">
+                <div className="font-medium mb-1">Raw (first 5 IDs per cohort)</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {['A','B'].map((c) => (
+                    <div key={c} className="space-y-1">
+                      <div className="font-medium">Cohort {c}</div>
+                      <div>PIP IDs: {(fairnessDetail.detail as any)[c].pip_ids.slice(0,5).join(', ') || '—'}</div>
+                      <div>Term IDs: {(fairnessDetail.detail as any)[c].term_ids.slice(0,5).join(', ') || '—'}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -679,7 +756,11 @@ export default function Analytics() {
                 
                 <div className="border-t pt-4">
                   <div className="text-xs text-muted-foreground">
-                    📈 Coaching volume correlates with {improvementRate}% improvement rate
+                    {improvementRate > 0 ? (
+                      <>📈 Coaching volume correlates with {improvementRate}% improvement rate</>
+                    ) : (
+                      <>📊 Coaching volume shown. Improvement rate baseline captured on auto‑firing.</>
+                    )}
                   </div>
                 </div>
               </CardContent>

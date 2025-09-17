@@ -21,7 +21,7 @@ import {
 } from "./pdfGenerator";
 import { requireRole, requireNotDryRun } from "./auth";
 import { assertTransition } from "./fsm";
-import { weeklyFairnessReport } from "./reports";
+import { weeklyFairnessReport, weeklyFairnessTrend, weeklyFairnessDetail } from "./reports";
 import { computeRoi } from "./roi";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -915,6 +915,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Fairness weekly report
   app.get("/api/reports/fairness/weekly", weeklyFairnessReport);
+  app.get("/api/reports/fairness/trend", weeklyFairnessTrend);
+  app.get("/api/reports/fairness/detail", weeklyFairnessDetail);
 
   // Generate sample data
   // Terminated employees routes
@@ -2409,11 +2411,12 @@ async function generateSampleData(storage: any) {
     // Generate PIP PDF
     await generatePIPPDF(pip, pipEmp);
     
-    // Create coaching sessions with PDFs
-    for (let week = 0; week < 4; week++) {
-      const sessionDate = new Date(Date.now() - (week * 7 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
-      const sessionScore = improved ? 70 + (week * 2) : initialScore + (week * 0.5);
-      const feedback = generateCoachingFeedback(sessionScore);
+      // Create coaching sessions with PDFs
+      for (let week = 0; week < 4; week++) {
+        const sessionDate = new Date(Date.now() - (week * 7 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+        // For demo, ensure several sessions land in the “effective” band (≥80)
+        const sessionScore = improved ? Math.min(95, 80 + (week * 2)) : initialScore + (week * 0.5);
+        const feedback = generateCoachingFeedback(sessionScore);
       
       await storage.createCoachingSession({
         employeeId: pipEmp.id,
