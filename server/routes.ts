@@ -146,6 +146,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/sample-csv", (_req, res) => {
+    const sampleCsv = [
+      ["employee_id", "period", "score", "tasks_completed", "date"],
+      ["E001", "1", "85", "10", "2024-03-31"],
+      ["E002", "1", "90", "12", "2024-03-31"],
+    ]
+      .map((row) => row.join(","))
+      .join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=\"sample.csv\""
+    );
+    res.send(sampleCsv);
+  });
+
   // PIP routes
   app.get("/api/pips", async (req, res) => {
     try {
