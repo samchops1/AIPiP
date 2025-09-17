@@ -1019,6 +1019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         if (employeeMetrics.length >= settings.consecutiveLowPeriods) {
+          const latestMetric = employeeMetrics[0];
           const allLowPerformance = employeeMetrics.every(m => 
             m.score < settings.minScoreThreshold || 
             m.utilization < settings.minUtilizationThreshold
@@ -1073,7 +1074,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
               continue; // Skip termination this cycle; allow PIP to run first
             }
-            const latestMetric = employeeMetrics[0];
             const reasons = [
               `Consistently scored below ${settings.minScoreThreshold}% for ${settings.consecutiveLowPeriods} consecutive periods`,
               `Utilization consistently below ${settings.minUtilizationThreshold}% vs company standard`,
@@ -1093,8 +1093,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               new Date().toISOString().split('T')[0]
             );
 
-            // Update employee status
+            // Update employee status and any active PIP
             await storage.updateEmployee(employee.id, { status: "terminated" });
+            const empPipsAfter = await storage.getPipsByEmployee(employee.id);
+            const activePip = empPipsAfter.find((p: any) => p.status === 'active');
+            if (activePip) {
+              await storage.updatePip(activePip.id, { status: 'terminated' });
+              await storage.createAuditLog({
+                action: 'pip_terminated',
+                entityType: 'pip',
+                entityId: activePip.id,
+                details: { employeeId: employee.id, reason: 'Termination via auto-fire' },
+              });
+            }
 
             // Create termination record
             await storage.createTerminatedEmployee({
@@ -2192,7 +2203,8 @@ async function generateSampleData(storage: any) {
     });
   }
 
-  // Jennifer Wilson - Poor performer (terminated)
+  // Jennifer Wilson - Poor performer (PIP history then terminated for demo consistency)
+  // Backfill older poor metrics
   for (let i = 0; i < 8; i++) {
     await storage.createPerformanceMetric({
       employeeId: "emp-006",
@@ -2204,16 +2216,50 @@ async function generateSampleData(storage: any) {
     });
   }
 
-  // Create termination record for Jennifer Wilson
+  // Create a PIP for Jennifer 6 weeks ago and two coaching sessions
+  const jenPipStart = new Date(Date.now() - 42 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const jenPipEnd = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const jenPip = await storage.createPip({
+    employeeId: "emp-006",
+    startDate: jenPipStart,
+    endDate: jenPipEnd,
+    gracePeriodDays: 28,
+    goals: [
+      "Achieve 70% average performance score",
+      "Maintain utilization at or above 60%",
+      "Attend weekly coaching sessions"
+    ],
+    coachingPlan: "Weekly feedback sessions focusing on core sales execution and follow-ups",
+    initialScore: 42,
+    currentScore: 44,
+    progress: 20,
+    improvementRequired: 15,
+    status: "active"
+  });
+  await storage.updateEmployee("emp-006", { status: "pip" });
+  const jenSessionDates = [28, 21].map(d => new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  for (const d of jenSessionDates) {
+    await storage.createCoachingSession({
+      employeeId: "emp-006",
+      pipId: jenPip.id,
+      type: "automated",
+      feedback: generateCoachingFeedback(44, "Jennifer Wilson", "Sales Representative"),
+      score: 44,
+      date: d
+    });
+  }
+  // Terminate after PIP period for demo
+  await storage.updatePip(jenPip.id, { status: "terminated" });
+  await storage.updateEmployee("emp-006", { status: "terminated" });
   await storage.createTerminatedEmployee({
     employeeId: "emp-006",
     employeeName: "Jennifer Wilson",
-    terminationDate: new Date(Date.now() - 4 * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    terminationDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     terminationReason: "Consistent poor performance and low utilization below company standards",
     terminationLetter: generateTerminationLetter("Jennifer Wilson", "Sales Representative", 41, 32, [
       "Consistently scored below 50% on performance metrics over 8 consecutive periods",
       "Utilization rate consistently below 40%, significantly under company standard of 60%",
-      "Failed to meet improvement targets during performance review periods",
+      "Failed to meet improvement targets during PIP",
       "Unable to complete minimum required tasks per week (5-8 vs required 12+)"
     ]),
     finalScore: 41,

@@ -69,6 +69,7 @@ The app enforces roles server‑side and also hides/guards HR‑only UI actions.
   - Coaching: effectiveness (by score bands) and volume.
   - Utilization Analysis: High/Medium/Low distribution.
   - Financial: investment, savings, ROI with editable assumptions; export JSON/CSV.
+  - Improvement Rate baseline: the dashboard snapshots a pre‑offboarding improvement rate baseline when you click Execute Auto‑Firing. Post‑offboarding, the card shows delta vs this baseline (e.g., “−6% vs baseline”).
 - Audit Logs: verify all actions with timestamps and entities.
 - Settings → Kill Switch: emergency pause of automated workflows.
 
@@ -104,6 +105,13 @@ The app enforces roles server‑side and also hides/guards HR‑only UI actions.
 - Coaching: effectiveness (≥80/60–79/<60) and volume (total/automated/avg per employee).
 - Utilization: High (≥80), Medium (60–79), Low (<60) distributions.
 - Financial: investment ((#PIPs×pipCost) + (#coaching×coachingCost)), savings (PIPs×successRate×replacementCost), ROI%.
+- Improvement Rate baseline: The dashboard captures the baseline on click of Auto‑Firing and the card displays the change vs baseline; this keeps your before/after story consistent even if offboarding resets the active PIP mix.
+
+#### Fairness Snapshot (Weekly)
+- What it shows: PIP and termination rates across two synthetic cohorts (A/B), assigned deterministically from employeeId. Rates are normalized by cohort size to avoid small‑cohort distortions.
+- Why it matters: Provides a high‑level signal for potential disparity. If one cohort consistently has higher PIP/termination rates, review inputs and rubrics.
+- Methodology (demo‑safe): Uses non‑sensitive synthetic cohorting (no protected attributes). Counts PIP proposals by unique employeeId (not total PIPs) to avoid inflation.
+- Next steps: In production, wire cohorts to your real fairness dimensions behind guardrails, with legal review and opt‑in.
 
 ### Data Upload
 - Upload a CSV to seed performance metrics; the system evaluates and proposes PIPs based on thresholds.
@@ -129,6 +137,30 @@ The app enforces roles server‑side and also hides/guards HR‑only UI actions.
 - Evidence Integrity: PDFs include a SHA‑256 hash; download endpoints stream from disk.
 - Audit Everything: any state change writes an audit entry with timestamp and details.
 - Fairness: weekly synthetic cohorts (A/B) with normalized rates; methodology visible in API and UI.
+- Demo Resilience: bulk coaching includes a fallback when no PIP employees are eligible (e.g., after offboarding) so the demo always shows activity while still recording proper sessions.
+
+---
+
+## Recommended Demo Script (Step‑by‑Step)
+
+1. Settings → confirm Kill Switch is off (System Active).
+2. Dashboard → Sample Data → Generate Sample Data.
+3. PIP Management → open a few PIP Details; generate a coaching session (Manager role).
+4. Coaching System →
+   - Use “Show eligible only” and “Only employees on PIP” filters.
+   - Bulk generate coaching (Manager role); note the summary (Success/Skipped) and sessions added.
+5. Dashboard → Review “Improvement Rate” (this is your baseline).
+6. Switch role to HR → Auto‑Firing System → Execute Auto‑Firing.
+   - Note: PIP‑before‑termination is enforced. Failing active employees are first placed on a PIP; only those already on a PIP and still failing are terminated.
+   - Terminated PIPs are shown in red in Dashboard and PIP Management.
+7. Analytics →
+   - Performance Distribution, Utilization, Departments, Companies.
+   - Coaching tabs: Effectiveness (≥80/60–79/<60) and Volume (Total/Automated).
+   - Financial tab: adjust Assumptions (salary/PIP cost/coaching cost/success rate). Export JSON or CSV.
+   - Note the Improvement Rate delta vs baseline captured just before Auto‑Firing.
+8. Audit Logs → verify creation/update/termination actions with timestamps.
+
+Pro tip: If you need to re‑run the demo cleanly, use Dashboard → Sample Data → Clear All Data, then regenerate.
 
 ---
 

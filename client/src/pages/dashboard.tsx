@@ -22,7 +22,7 @@ export default function Dashboard() {
   const [role, setRole] = useState<string>(() => (typeof window !== 'undefined' ? (window.localStorage.getItem('demoRole') || 'hr') : 'hr'));
 
   useEffect(() => {
-    const updateRole = (e: any) => setRole(e?.detail || (window.localStorage.getItem('demoRole') || 'viewer'));
+    const updateRole = (e: any) => setRole(e?.detail || (window.localStorage.getItem('demoRole') || 'hr'));
     const storageListener = () => setRole(window.localStorage.getItem('demoRole') || 'hr');
     window.addEventListener('demoRoleChanged', updateRole as any);
     window.addEventListener('storage', storageListener);
@@ -252,7 +252,13 @@ export default function Dashboard() {
                   <Button 
                     variant="destructive"
                     size="sm" 
-                    onClick={() => autoFireMutation.mutate()}
+                    onClick={() => {
+                      const ir = (dashboardMetrics as any)?.improvementRate;
+                      if (typeof ir === 'number' && !Number.isNaN(ir)) {
+                        try { window.localStorage.setItem('baselineImprovementRate', String(ir)); } catch {}
+                      }
+                      autoFireMutation.mutate();
+                    }}
                     disabled={autoFireMutation.isPending}
                     data-testid="button-auto-fire"
                   >

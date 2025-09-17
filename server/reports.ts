@@ -12,7 +12,9 @@ export async function weeklyFairnessReport(_req: Request, res: Response) {
   const by = (arr: any[], keyFn: (x: any) => string) =>
     arr.reduce((m, x) => ((m[keyFn(x)] ??= []).push(x), m), {} as Record<string, any[]>);
 
-  const pByC = by(pips || [], (p: any) => cohort(p.employeeId));
+  // Count unique employees proposed for PIP to avoid inflating counts when multiple PIPs exist
+  const pipEmpIds = Array.from(new Set((pips || []).map((p: any) => p.employeeId))).map(id => ({ employeeId: id }));
+  const pByC = by(pipEmpIds, (p: any) => cohort(p.employeeId));
   const tByC = by(terms || [], (t: any) => cohort(t.employeeId));
   const eByC = by(employees || [], (e: any) => cohort(e.id));
 

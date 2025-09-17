@@ -22,6 +22,12 @@ export default function MetricsCards({ metrics, isLoading }: MetricsCardsProps) 
     );
   }
 
+  const baselineIR = (typeof window !== 'undefined' ? Number(window.localStorage.getItem('baselineImprovementRate')) : NaN);
+  const currentIR = metrics?.improvementRate ?? 0;
+  const hasBaseline = Number.isFinite(baselineIR);
+  const deltaIR = hasBaseline ? (currentIR - baselineIR) : null;
+  const deltaIRText = hasBaseline ? `${deltaIR! >= 0 ? '+' : ''}${Math.round(deltaIR!)}% vs baseline` : '+8% vs last quarter';
+
   const cards = [
     {
       title: "Total Employees",
@@ -39,8 +45,8 @@ export default function MetricsCards({ metrics, isLoading }: MetricsCardsProps) 
     },
     {
       title: "Improvement Rate",
-      value: `${metrics?.improvementRate || 0}%`,
-      change: "+8% vs last quarter",
+      value: `${currentIR}%`,
+      change: deltaIRText,
       icon: TrendingUp,
       color: "text-chart-2"
     },

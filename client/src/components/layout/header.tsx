@@ -21,18 +21,18 @@ export default function Header() {
   const today = new Date().toISOString().split('T')[0];
 
   // Demo role state (used for filtering + header control)
-  const [demoRole, setDemoRole] = useState<string>('hr');
+  const [demoRole, setDemoRole] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'hr';
+    const saved = window.localStorage.getItem('demoRole');
+    const role = saved || 'hr';
+    // Ensure localStorage is set synchronously so other pages can read it on first render
+    if (!saved) window.localStorage.setItem('demoRole', role);
+    return role;
+  });
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const saved = window.localStorage.getItem('demoRole');
-    if (saved) {
-      setDemoRole(saved);
-    } else {
-      window.localStorage.setItem('demoRole', 'hr');
-      setDemoRole('hr');
-      // broadcast so listeners (e.g., Dashboard) sync immediately
-      window.dispatchEvent(new CustomEvent('demoRoleChanged', { detail: 'hr' }));
-    }
+    // Broadcast current role on mount so listeners render correct state
+    window.dispatchEvent(new CustomEvent('demoRoleChanged', { detail: demoRole }));
   }, []);
 
   // Use stateful demoRole for filtering; seed localStorage if missing
