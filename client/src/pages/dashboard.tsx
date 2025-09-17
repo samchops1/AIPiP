@@ -87,9 +87,20 @@ export default function Dashboard() {
   const autoFireMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/auto-fire/demo'),
     onSuccess: async (data: any) => {
-      // Fetch all terminated employees to show in modal, not just newly terminated ones
-      const allTerminated = await apiRequest('GET', '/api/terminated-employees');
-      setTerminatedEmployeesData(allTerminated || []);
+      try {
+        // Fetch all terminated employees to show in modal, not just newly terminated ones
+        const allTerminated = await apiRequest('GET', '/api/terminated-employees');
+        setTerminatedEmployeesData(allTerminated || []);
+      } catch (error) {
+        // Fall back to newly terminated employees from the auto-fire response
+        console.error('Failed to fetch all terminated employees:', error);
+        setTerminatedEmployeesData(data.terminated || []);
+        toast({
+          title: 'Warning',
+          description: 'Could not load all terminated employees. Showing recently terminated only.',
+          variant: 'destructive'
+        });
+      }
       setShowAutoFiringModal(true);
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
       queryClient.invalidateQueries({ queryKey: ['/api/terminated-employees'] });
