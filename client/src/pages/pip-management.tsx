@@ -191,6 +191,12 @@ export default function PipManagement() {
 
   return (
     <div className="flex-1 p-6 overflow-auto" data-testid="pip-management-page">
+      {/* Policy/Error Banners for termination gating */}
+      <div className="mb-4 space-y-2">
+        <div className="text-xs text-muted-foreground">
+          Note: Termination evaluation requires legal and HR signoff and is blocked in DRY_RUN mode.
+        </div>
+      </div>
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>

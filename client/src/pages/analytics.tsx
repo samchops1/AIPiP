@@ -53,6 +53,10 @@ export default function Analytics() {
     select: (data) => data?.filter((session: any) => session.type === 'automated') || []
   });
 
+  const { data: fairness } = useQuery({
+    queryKey: ['/api/reports/fairness/weekly'],
+  });
+
   // Calculate analytics
   const totalEmployees = employees?.length || 0;
   const activeEmployees = employees?.filter((e: any) => e.status === 'active').length || 0;
@@ -238,6 +242,43 @@ export default function Analytics() {
                 ${costSavings.toLocaleString()} saved
               </div>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Fairness Snapshot */}
+      <div className="mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Fairness Snapshot (Weekly)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {fairness?.report ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {fairness.report.map((row: any) => (
+                  <div key={row.cohort} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Cohort {row.cohort}</span>
+                      <span className="text-xs text-muted-foreground">PIPs: {row.pip_rate} • Terms: {row.termination_rate}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-xs">PIP Count</div>
+                      <div className="h-2 bg-muted rounded">
+                        <div className="h-2 bg-primary rounded" style={{ width: `${Math.min(100, row.pip_rate * 5)}%` }} />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-xs">Termination Count</div>
+                      <div className="h-2 bg-muted rounded">
+                        <div className="h-2 bg-destructive rounded" style={{ width: `${Math.min(100, row.termination_rate * 5)}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">No fairness data yet.</div>
+            )}
           </CardContent>
         </Card>
       </div>

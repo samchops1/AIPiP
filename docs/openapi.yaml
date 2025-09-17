@@ -1,0 +1,75 @@
+openapi: 3.1.0
+info:
+  title: AIPiP API
+  version: 0.1.0
+paths:
+  /api/evaluate-pips:
+    post:
+      summary: Evaluate all employees and propose PIPs as needed
+      responses:
+        "200": { description: OK }
+        "403": { description: Forbidden }
+  /api/pips:
+    get:
+      summary: List PIPs
+      responses:
+        "200": { description: OK }
+    post:
+      summary: Create a PIP proposal (manager only)
+      responses:
+        "201": { description: Created }
+        "403": { description: Forbidden }
+  /api/pips/{id}:
+    put:
+      summary: Update a PIP (manager only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Updated }
+        "403": { description: Forbidden }
+        "409": { description: Illegal transition }
+  /api/evaluate-terminations:
+    post:
+      summary: Decide offboarding for PIPs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                legal_signoff: { type: boolean }
+                hr_signoff: { type: boolean }
+                risk_flags:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200": { description: Draft or proceed }
+        "403": { description: Forbidden }
+        "409": { description: Dry run or blocked by policy }
+  /api/download-pdf/{filename}:
+    get:
+      summary: Download a generated PDF
+      parameters:
+        - in: path
+          name: filename
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: PDF stream }
+        "404": { description: Not Found }
+  /api/reports/fairness/weekly:
+    get:
+      summary: Weekly fairness snapshot (synthetic cohorts)
+      responses:
+        "200": { description: OK }
+components:
+  securitySchemes:
+    demoRole:
+      type: apiKey
+      in: header
+      name: x-demo-role
+

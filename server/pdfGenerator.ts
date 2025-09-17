@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 // Ensure PDF directory exists
 const pdfDir = path.join(process.cwd(), 'generated_pdfs');
@@ -16,7 +17,7 @@ export function generateTerminationPDF(
   finalUtilization: number,
   reasons: string[],
   terminationDate: string
-): Promise<string> {
+): Promise<{ filePath: string; filename: string; url: string; sha256: string }> {
   const doc = new PDFDocument();
   const fileName = `Termination_${employeeId}_${Date.now()}.pdf`;
   const filePath = path.join(pdfDir, fileName);
@@ -83,7 +84,9 @@ export function generateTerminationPDF(
   // Finalize PDF and wait for completion
   return new Promise((resolve, reject) => {
     doc.on('end', () => {
-      resolve(filePath);
+      const buf = fs.readFileSync(filePath);
+      const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
+      resolve({ filePath, filename: fileName, url: `/api/download-pdf/${fileName}`, sha256 });
     });
     doc.on('error', reject);
     doc.end();
@@ -98,7 +101,7 @@ export function generateCoachingPDF(
   feedback: string,
   type: string,
   pipId?: string
-): Promise<string> {
+): Promise<{ filePath: string; filename: string; url: string; sha256: string }> {
   const doc = new PDFDocument({ margin: 40 });
   const fileName = `Coaching_${employeeId}_${Date.now()}.pdf`;
   const filePath = path.join(pdfDir, fileName);
@@ -255,7 +258,9 @@ export function generateCoachingPDF(
   // Finalize PDF and wait for completion
   return new Promise((resolve, reject) => {
     doc.on('end', () => {
-      resolve(filePath);
+      const buf = fs.readFileSync(filePath);
+      const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
+      resolve({ filePath, filename: fileName, url: `/api/download-pdf/${fileName}`, sha256 });
     });
     doc.on('error', reject);
     doc.end();
@@ -265,7 +270,7 @@ export function generateCoachingPDF(
 export function generatePIPPDF(
   pip: any,
   employee: any
-): Promise<string> {
+): Promise<{ filePath: string; filename: string; url: string; sha256: string }> {
   const doc = new PDFDocument({ margin: 50 });
   const fileName = `PIP_${employee.id}_${Date.now()}.pdf`;
   const filePath = path.join(pdfDir, fileName);
@@ -498,7 +503,9 @@ export function generatePIPPDF(
   // Finalize PDF and wait for completion
   return new Promise((resolve, reject) => {
     doc.on('end', () => {
-      resolve(filePath);
+      const buf = fs.readFileSync(filePath);
+      const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
+      resolve({ filePath, filename: fileName, url: `/api/download-pdf/${fileName}`, sha256 });
     });
     doc.on('error', reject);
     doc.end();
@@ -510,7 +517,7 @@ export function generateBulkPerformanceReportPDF(
   metrics: any[],
   pips: any[],
   improvementRate: number
-): Promise<string> {
+): Promise<{ filePath: string; filename: string; url: string; sha256: string }> {
   const doc = new PDFDocument();
   const fileName = `Performance_Report_${Date.now()}.pdf`;
   const filePath = path.join(pdfDir, fileName);
@@ -600,7 +607,9 @@ export function generateBulkPerformanceReportPDF(
   // Finalize PDF and wait for completion
   return new Promise((resolve, reject) => {
     doc.on('end', () => {
-      resolve(filePath);
+      const buf = fs.readFileSync(filePath);
+      const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
+      resolve({ filePath, filename: fileName, url: `/api/download-pdf/${fileName}`, sha256 });
     });
     doc.on('error', reject);
     doc.end();

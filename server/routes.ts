@@ -21,6 +21,7 @@ import {
 } from "./pdfGenerator";
 import { requireRole, requireNotDryRun } from "./auth";
 import { assertTransition } from "./fsm";
+import { weeklyFairnessReport } from "./reports";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -379,7 +380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Generate PDF for coaching session
       if (employee) {
-        const pdfPath = await generateCoachingPDF(
+        const pdf = await generateCoachingPDF(
           employee.name,
           employeeId,
           new Date().toISOString().split('T')[0],
@@ -870,6 +871,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fairness weekly report
+  app.get("/api/reports/fairness/weekly", weeklyFairnessReport);
+
   // Generate sample data
   // Terminated employees routes
   app.get("/api/terminated-employees", async (req, res) => {
@@ -908,7 +912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ];
 
       // Generate PDF on demand
-      const pdfPath = await generateTerminationPDF(
+      const pdf = await generateTerminationPDF(
         terminatedEmployee.employeeName,
         employeeId,
         employee.role || "Employee",
@@ -918,7 +922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         terminatedEmployee.terminationDate
       );
 
-      const pdfBuffer = fs.readFileSync(pdfPath);
+      const pdfBuffer = fs.readFileSync(pdf.filePath);
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${terminatedEmployee.employeeName.replace(/\s+/g, '_')}_Termination_Letter.pdf"`);
@@ -1006,7 +1010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ];
 
             // Generate PDF for termination
-            const pdfPath = await generateTerminationPDF(
+            const pdf = await generateTerminationPDF(
               employee.name,
               employee.id,
               employee.role || "Employee",
@@ -1110,7 +1114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allMetrics = await storage.getAllPerformanceMetrics();
       const pips = await storage.getAllPips();
       const improvementRate = results.improvementRate || 0;
-      const reportPath = await generateBulkPerformanceReportPDF(
+      const report = await generateBulkPerformanceReportPDF(
         employees,
         allMetrics,
         pips,
@@ -1124,7 +1128,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...results,
           pipEvaluation: pipResults,
           biasDetected: biasResults.length,
-          performanceReportPDF: reportPath
+          performanceReportPDF: report.filePath,
+          performanceReport: { url: report.url, sha256: report.sha256 }
         }
       });
     } catch (error) {
@@ -1181,13 +1186,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Generate PDF document
-      const pdfPath = await generatePIPPDF(pip, employee);
-      const filename = path.basename(pdfPath);
+      const pdf = await generatePIPPDF(pip, employee);
+      const filename = path.basename(pdf.filePath);
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       
-      const fileStream = fs.createReadStream(pdfPath);
+      const fileStream = fs.createReadStream(pdf.filePath);
       fileStream.pipe(res);
     } catch (error) {
       console.error('Error generating PIP document:', error);
