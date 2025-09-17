@@ -88,11 +88,17 @@ export default function Dashboard() {
     mutationFn: () => apiRequest('POST', '/api/auto-fire/demo'),
     onSuccess: async (data: any) => {
       try {
+        // Add a small delay to ensure auto-firing process has completed
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         // Fetch all terminated employees to show in modal, not just newly terminated ones
         const allTerminated = await apiRequest('GET', '/api/terminated-employees');
+        console.log('Fetched terminated employees:', allTerminated);
+        console.log('Is array?', Array.isArray(allTerminated));
+        console.log('Length:', allTerminated?.length);
         
         // Transform the data structure to match what AutoFiringModal expects
-        const transformedEmployees = (allTerminated || []).map((emp: any) => ({
+        const transformedEmployees = Array.isArray(allTerminated) ? allTerminated.map((emp: any) => ({
           id: emp.employeeId,
           name: emp.employeeName,
           role: emp.role || "Employee", // fallback if role not available
@@ -100,20 +106,23 @@ export default function Dashboard() {
           finalUtilization: emp.finalUtilization,
           reason: emp.terminationReason,
           terminationLetter: emp.terminationLetter
-        }));
+        })) : [];
         
+        console.log('Transformed employees:', transformedEmployees);
+        console.log('Setting terminated employees data:', transformedEmployees.length);
         setTerminatedEmployeesData(transformedEmployees);
+        setShowAutoFiringModal(true); // Open modal after successful data fetch
       } catch (error) {
         // Fall back to newly terminated employees from the auto-fire response
         console.error('Failed to fetch all terminated employees:', error);
         setTerminatedEmployeesData(data.terminated || []);
+        setShowAutoFiringModal(true); // Open modal even with fallback data
         toast({
           title: 'Warning',
           description: 'Could not load all terminated employees. Showing recently terminated only.',
           variant: 'destructive'
         });
       }
-      setShowAutoFiringModal(true);
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
       queryClient.invalidateQueries({ queryKey: ['/api/terminated-employees'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard-metrics'] });
