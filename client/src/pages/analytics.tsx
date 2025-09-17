@@ -72,7 +72,9 @@ export default function Analytics() {
   // Calculate analytics
   const totalEmployees = employees?.length || 0;
   const activeEmployees = employees?.filter((e: any) => e.status === 'active').length || 0;
-  const pipEmployees = employees?.filter((e: any) => e.status === 'pip').length || 0;
+  const activePipCount = ((pips as any[])?.length) || 0; // API returns active PIPs by default
+  const pipEmployeesFromStatus = employees?.filter((e: any) => e.status === 'pip').length || 0;
+  const pipEmployees = Math.max(activePipCount, pipEmployeesFromStatus);
   const terminated = terminatedEmployees?.length || 0;
   const improvementRate = dashboardMetrics?.improvementRate || 0;
 
@@ -127,10 +129,10 @@ export default function Analytics() {
   const assumedPipSuccessRate = Math.min(1, Math.max(0, Number(assumptions.pipSuccessRate) || 0));
 
   const totalTerminationCost = terminated * terminationCost;
-  const totalPipCost = (pips as any[])?.length ? (pips as any[]).length * pipCost : pipEmployees * pipCost;
-  const totalCoachingCost = (coachingSessions?.length || 0) * coachingCost;
+  const totalPipCost = activePipCount * pipCost;
+  const totalCoachingCost = (automatedSessions?.length || 0) * coachingCost;
   const totalInvestment = totalPipCost + totalCoachingCost;
-  const potentialSavings = (pipEmployees * assumedPipSuccessRate * terminationCost);
+  const potentialSavings = (activePipCount * assumedPipSuccessRate * terminationCost);
   const roi = totalInvestment > 0 ? (((potentialSavings - totalInvestment) / totalInvestment) * 100) : 0;
 
   const generateReport = () => {
@@ -168,14 +170,14 @@ export default function Analytics() {
     const rows: Array<Record<string, any>> = [];
     rows.push({ metric: 'total_employees', value: totalEmployees });
     rows.push({ metric: 'active_employees', value: activeEmployees });
-    rows.push({ metric: 'pip_employees', value: pipEmployees });
+    rows.push({ metric: 'active_pips', value: activePipCount });
     rows.push({ metric: 'terminated', value: terminated });
     rows.push({ metric: 'avg_salary', value: avgSalary });
     rows.push({ metric: 'termination_cost', value: terminationCost });
     rows.push({ metric: 'pip_cost', value: pipCost });
     rows.push({ metric: 'coaching_cost', value: coachingCost });
     rows.push({ metric: 'pip_success_rate', value: assumedPipSuccessRate });
-    rows.push({ metric: 'num_pips', value: (pips as any[])?.length || pipEmployees });
+    rows.push({ metric: 'num_pips', value: activePipCount });
     rows.push({ metric: 'num_coaching_sessions', value: (coachingSessions?.length || 0) });
     rows.push({ metric: 'savings', value: Math.round(potentialSavings) });
     rows.push({ metric: 'investment', value: totalInvestment });
@@ -304,7 +306,7 @@ export default function Analytics() {
                 <p className="text-sm font-medium text-muted-foreground">
                   <TooltipProvider><Tooltip><TooltipTrigger asChild><span>Active PIPs</span></TooltipTrigger><TooltipContent>Employees currently on Performance Improvement Plans.</TooltipContent></Tooltip></TooltipProvider>
                 </p>
-                <p className="text-2xl font-bold">{pipEmployees}</p>
+                <p className="text-2xl font-bold">{activePipCount}</p>
               </div>
               <Target className="w-8 h-8 text-orange-500" />
             </div>
@@ -503,11 +505,11 @@ export default function Analytics() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{Math.max(0, Math.round(pipEmployees * assumedPipSuccessRate))}</div>
+                    <div className="text-2xl font-bold text-green-600">{Math.max(0, Math.round(activePipCount * assumedPipSuccessRate))}</div>
                     <div className="text-xs text-green-600">Expected Success</div>
                   </div>
                   <div className="text-center p-4 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{Math.max(0, pipEmployees - Math.round(pipEmployees * assumedPipSuccessRate))}</div>
+                    <div className="text-2xl font-bold text-red-600">{Math.max(0, activePipCount - Math.round(activePipCount * assumedPipSuccessRate))}</div>
                     <div className="text-xs text-red-600">At Risk</div>
                   </div>
                 </div>
@@ -742,7 +744,19 @@ export default function Analytics() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Financial Impact</CardTitle>
+                <CardTitle className="flex items-center space-x-2">
+                  <span>Financial Impact</span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-xs underline cursor-help text-muted-foreground">What is this?</span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm">
+                        Investment = (#PIPs × PIP cost) + (#coaching sessions × coaching cost). Costs are driven by your Assumptions above.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
@@ -779,7 +793,19 @@ export default function Analytics() {
 
             <Card>
               <CardHeader>
-                <CardTitle>ROI Breakdown</CardTitle>
+                <CardTitle className="flex items-center space-x-2">
+                  <span>ROI Breakdown</span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-xs underline cursor-help text-muted-foreground">What is this?</span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm">
+                        ROI% = (Savings − Investment) / Investment × 100. Savings are avoided replacements: PIPs × success rate × (50% of salary), editable in Assumptions.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center">

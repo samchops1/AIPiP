@@ -57,7 +57,9 @@ The app enforces roles server‑side and also hides/guards HR‑only UI actions.
 - Coaching sessions are logged, PDF reports can be downloaded.
 
 4) Legal/HR gate and offboarding demo (HR only)
-- Dashboard → Auto‑Firing System → Execute Auto‑Firing (HR role). This evaluates consecutive non‑performance and surfaces terminations with letters and audit entries.
+- Dashboard → Auto‑Firing System → Execute Auto‑Firing (HR role).
+  - Demo flow enforces “PIP before termination”: if an active employee fails the consecutive low‑performance check and is not already on a PIP, the system auto‑creates a PIP and does not terminate on that cycle.
+  - Employees already on a PIP who continue to fail can be terminated. Termination letters and audit entries are generated.
 - Legal/HR gate is enforced at API layer (e.g., for programmatic usage when applicable).
 
 5) Govern and analyze
@@ -78,18 +80,20 @@ The app enforces roles server‑side and also hides/guards HR‑only UI actions.
 - Sample Data: creates a realistic dataset (safe to re‑run); “Clear” to reset.
 - Auto‑Firing (HR): HR‑only demo to evaluate and list offboarding candidates.
 - Terminated Employees: click an entry to view details and letters.
-- Active PIP Management (preview): quick access to employee PIPs; “View Details” opens an inline modal.
+- Active PIP Management (preview): quick access to employee PIPs; “View Details” opens an inline modal. PIPs belonging to terminated employees are highlighted in red with a TERMINATED badge.
 
 ### PIP Management
 - Create PIP (Manager): set grace period, goals, coaching plan, and required improvement.
 - Update PIPs (Manager): adjust goals/plan; FSM guardrails prevent illegal status changes.
 - Generate Coaching (Manager): single‑click coaching per PIP, documented and exportable.
+- Visibility: includes active and terminated PIPs; terminated PIPs are shown in red (matching the dashboard behavior).
 
 ### Coaching System
 - Filters:
   - Show eligible only (not terminated + has recent metric)
   - Only employees on PIP
 - Bulk coaching (Manager): generate coaching sessions for all eligible PIP employees in one click.
+  - Demo fallback: if no PIP employees are eligible (e.g., after auto‑firing), the system generates a small number of sessions for active, non‑terminated employees with recent metrics so the demo always shows activity.
 - Coaching feedback modal: animated status, structured feedback, and PDF download.
 
 ### Analytics
@@ -110,7 +114,7 @@ The app enforces roles server‑side and also hides/guards HR‑only UI actions.
 
 ### Settings (with Kill Switch)
 - PIP thresholds: score thresholds, consecutive periods, grace period days, minimum improvement.
-- Emergency Controls → Kill Switch:
+- Emergency Controls → Kill Switch (Settings only):
   - Emergency Stop immediately pauses automated workflows (evaluate PIPs, coaching generation, termination).
   - “Reactivate System” to resume.
 
@@ -121,6 +125,7 @@ The app enforces roles server‑side and also hides/guards HR‑only UI actions.
 - RBAC: viewer/manager/HR with server‑enforced role checks.
 - Legal/HR Gate: HR‑only endpoints for termination, body schema includes sign‑off flags and risk guards.
 - FSM Guardrails: single source of truth for allowed PIP transitions; illegal transitions return 409.
+- PIP‑before‑termination (demo): auto‑firing first places failing active employees on a PIP; only employees already on PIP and still failing are terminated.
 - Evidence Integrity: PDFs include a SHA‑256 hash; download endpoints stream from disk.
 - Audit Everything: any state change writes an audit entry with timestamp and details.
 - Fairness: weekly synthetic cohorts (A/B) with normalized rates; methodology visible in API and UI.
@@ -185,4 +190,3 @@ If you need deeper information (e.g., OpenAPI spec), see `docs/openapi.yaml`.
 ---
 
 If you have any questions or want a guided walkthrough, start from the Dashboard, switch roles via the header, and follow the workflow above. This app is intentionally interview‑ready: safe, governed, and easy to explain.
-

@@ -172,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }));
         res.json(pipsWithNames);
       } else {
-        const pips = await storage.getAllActivePips();
+        const pips = await storage.getAllPips();
         const pipsWithNames = await Promise.all(pips.map(async (pip: any) => {
           const employee = await storage.getEmployee(pip.employeeId);
           return {
@@ -1042,6 +1042,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           if (allLowPerformance) {
+            // Require PIP before termination: if not on PIP, auto-create a PIP instead of immediate termination
+            const hasActivePip = (await storage.getPipsByEmployee(employee.id)).some((p: any) => p.status === 'active');
+            if (!hasActivePip && (employee.status !== 'pip')) {
+              const startDate = new Date().toISOString().split('T')[0];
+              const endDate = new Date(Date.now() + settings.defaultGracePeriod * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+              const pip = await storage.createPip({
+                employeeId: employee.id,
+                startDate,
+                endDate,
+                gracePeriodDays: settings.defaultGracePeriod,
+                goals: [
+                  `Achieve ${settings.minScoreThreshold + 10}% average score`,
+                  `Maintain utilization at or above ${settings.minUtilizationThreshold}%`,
+                  'Attend weekly coaching sessions',
+                ],
+                coachingPlan: 'Weekly feedback sessions focusing on performance improvement areas',
+                initialScore: latestMetric.score,
+                currentScore: latestMetric.score,
+                progress: 0,
+                improvementRequired: settings.minImprovementPercent,
+                status: 'active',
+              });
+              await storage.updateEmployee(employee.id, { status: 'pip' });
+              await storage.createAuditLog({
+                action: 'pip_created_automatically',
+                entityType: 'pip',
+                entityId: pip.id,
+                details: { employeeId: employee.id, reason: 'Consecutive poor performance detected by auto-fire evaluation' },
+              });
+              continue; // Skip termination this cycle; allow PIP to run first
+            }
             const latestMetric = employeeMetrics[0];
             const reasons = [
               `Consistently scored below ${settings.minScoreThreshold}% for ${settings.consecutiveLowPeriods} consecutive periods`,

@@ -72,34 +72,7 @@ export default function Sidebar() {
         </ul>
       </nav>
 
-      {/* Emergency Controls */}
-      <div className="p-3 border-t border-border">
-        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-destructive">Emergency Controls</span>
-            <div 
-              className={cn(
-                "w-2 h-2 rounded-full",
-(systemSettings as any)?.killSwitchActive ? "bg-destructive" : "bg-accent"
-              )}
-              data-testid="system-status-indicator"
-            />
-          </div>
-          <Link 
-            href="/settings"
-            className={cn(
-              "w-full px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center",
-(systemSettings as any)?.killSwitchActive
-                ? "bg-accent text-accent-foreground hover:bg-accent/90"
-                : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            )}
-            data-testid="emergency-controls-button"
-          >
-            <Shield className="w-4 h-4 mr-2" />
-            {(systemSettings as any)?.killSwitchActive ? "System Paused" : "Kill Switch"}
-          </Link>
-        </div>
-      </div>
+      {/* Kill Switch moved to Settings page only */}
     </aside>
   );
 }

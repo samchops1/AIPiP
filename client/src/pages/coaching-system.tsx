@@ -173,7 +173,19 @@ export default function CoachingSystem() {
       const list = (activePips as any[]) || [];
 
       const terminatedSet = new Set(((terminatedEmployees as any[]) || []).map((e: any) => e.employeeId));
-      const eligible = list.filter((pip: any) => !terminatedSet.has(pip.employeeId));
+      let eligible = list.filter((pip: any) => !terminatedSet.has(pip.employeeId));
+
+      // Fallback for demo: if no eligible PIP employees, generate coaching for a small
+      // set of active, non-terminated employees with recent metrics.
+      if (eligible.length === 0) {
+        const pool = ((employees as any[]) || [])
+          .filter((e: any) => !terminatedSet.has(e.id))
+          .filter((e: any) => hasRecentMetric(e.id))
+          .slice(0, 5) // keep small for demo
+          .map((e: any) => ({ employeeId: e.id, id: undefined }));
+        // Treat as pseudo-PIPs for bulk coaching generation
+        eligible = pool as any;
+      }
 
       for (const pip of eligible) {
         const latestScore = getEmployeeLatestScore(pip.employeeId);

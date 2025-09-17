@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -30,6 +30,8 @@ export default function PipCards({ pips, isLoading }: PipCardsProps) {
   const [showCoachingModal, setShowCoachingModal] = useState(false);
   const [coachingEmployee, setCoachingEmployee] = useState<any>(null);
   const [coachingFeedback, setCoachingFeedback] = useState('');
+  const { data: terminatedEmployees } = useQuery({ queryKey: ['/api/terminated-employees'] });
+  const terminatedSet = new Set(((terminatedEmployees as any[]) || []).map((e: any) => e.employeeId));
   const [selectedPip, setSelectedPip] = useState<any>(null);
   const [showPipDetails, setShowPipDetails] = useState(false);
 
@@ -149,7 +151,7 @@ export default function PipCards({ pips, isLoading }: PipCardsProps) {
               return (
                 <Card 
                   key={pip.id} 
-                  className="hover:shadow-lg transition-shadow"
+                  className={`hover:shadow-lg transition-shadow ${pip.status === 'terminated' || terminatedSet.has(pip.employeeId) ? 'border border-red-400 bg-red-50/50' : ''}`}
                   data-testid={`pip-card-${pip.id}`}
                 >
                   <CardContent className="p-4">
@@ -165,12 +167,16 @@ export default function PipCards({ pips, isLoading }: PipCardsProps) {
                           <p className="text-xs text-muted-foreground">{pip.employeeId}</p>
                         </div>
                       </div>
-                      <Badge 
-                        className={statusColor}
-                        data-testid={`pip-status-badge-${pip.id}`}
-                      >
-                        {statusText}
-                      </Badge>
+                      {pip.status === 'terminated' || terminatedSet.has(pip.employeeId) ? (
+                        <Badge variant="destructive">TERMINATED</Badge>
+                      ) : (
+                        <Badge 
+                          className={statusColor}
+                          data-testid={`pip-status-badge-${pip.id}`}
+                        >
+                          {statusText}
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="space-y-2 mb-4">

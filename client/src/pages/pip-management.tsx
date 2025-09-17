@@ -44,11 +44,13 @@ export default function PipManagement() {
   const { data: activePips, isLoading } = useQuery({
     queryKey: ['/api/pips'],
     queryFn: async () => {
-      const response = await fetch('/api/pips?active=true');
+      const response = await fetch('/api/pips'); // include terminated too
       if (!response.ok) throw new Error('Failed to fetch PIPs');
       return response.json();
     }
   });
+  const { data: terminatedEmployees } = useQuery({ queryKey: ['/api/terminated-employees'] });
+  const terminatedSet = new Set(((terminatedEmployees as any[]) || []).map((e: any) => e.employeeId));
 
   const { data: employees } = useQuery({
     queryKey: ['/api/employees'],
@@ -360,7 +362,7 @@ export default function PipManagement() {
             const progress = pip.progress || 0;
             
             return (
-              <Card key={pip.id} className="hover:shadow-lg transition-shadow">
+              <Card key={pip.id} className={`hover:shadow-lg transition-shadow ${pip.status === 'terminated' || terminatedSet.has(pip.employeeId) ? 'border border-red-400 bg-red-50/50' : ''}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">

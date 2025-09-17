@@ -45,7 +45,7 @@ export default function Dashboard() {
   const { data: activePips, isLoading: pipsLoading } = useQuery({
     queryKey: ['/api/pips'],
     queryFn: async () => {
-      const response = await fetch('/api/pips?active=true');
+      const response = await fetch('/api/pips'); // show all, including terminated
       if (!response.ok) throw new Error('Failed to fetch PIPs');
       return response.json();
     }
@@ -147,6 +147,8 @@ export default function Dashboard() {
     }
   });
 
+  const isHr = role === 'hr' || (typeof window !== 'undefined' && (window.localStorage.getItem('demoRole') || 'hr') === 'hr');
+
   return (
     <div className="flex-1 p-6 overflow-auto" data-testid="dashboard-content">
       <div className="mb-8">
@@ -245,7 +247,7 @@ export default function Dashboard() {
                 <p className="text-sm text-muted-foreground mb-3">
                   Demonstrate automated termination based on performance and utilization
                 </p>
-                {role === 'hr' ? (
+                {isHr ? (
                   <TooltipProvider><Tooltip><TooltipTrigger asChild>
                   <Button 
                     variant="destructive"
