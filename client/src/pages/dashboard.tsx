@@ -90,7 +90,19 @@ export default function Dashboard() {
       try {
         // Fetch all terminated employees to show in modal, not just newly terminated ones
         const allTerminated = await apiRequest('GET', '/api/terminated-employees');
-        setTerminatedEmployeesData(allTerminated || []);
+        
+        // Transform the data structure to match what AutoFiringModal expects
+        const transformedEmployees = (allTerminated || []).map((emp: any) => ({
+          id: emp.employeeId,
+          name: emp.employeeName,
+          role: emp.role || "Employee", // fallback if role not available
+          finalScore: emp.finalScore,
+          finalUtilization: emp.finalUtilization,
+          reason: emp.terminationReason,
+          terminationLetter: emp.terminationLetter
+        }));
+        
+        setTerminatedEmployeesData(transformedEmployees);
       } catch (error) {
         // Fall back to newly terminated employees from the auto-fire response
         console.error('Failed to fetch all terminated employees:', error);
