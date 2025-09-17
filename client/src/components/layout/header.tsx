@@ -19,9 +19,26 @@ export default function Header() {
 
   // Count recent notifications (logs from today)
   const today = new Date().toISOString().split('T')[0];
-  const todayLogs = (auditLogs as any[])?.filter((log: any) => 
-    log.timestamp && log.timestamp.toString().startsWith(today)
-  ) || [];
+  const role = typeof window !== 'undefined' ? (window.localStorage.getItem('demoRole') || 'viewer') : 'viewer';
+  const managerActions = new Set([
+    'pip_created', 'pip_updated', 'pip_created_automatically', 'coaching_generated', 'coaching_session_created', 'csv_uploaded', 'template_generated'
+  ]);
+  const hrActions = new Set([
+    'employee_auto_terminated', 'employee_terminated_automatically', 'termination', 'system_settings_updated', 'cicd_simulation_run', 'triage_agents_run'
+  ]);
+  const viewerActions = new Set(['system_settings_updated']);
+
+  const roleFilter = (log: any) => {
+    const action = String(log.action || '').toLowerCase();
+    if (role === 'manager') return managerActions.has(action);
+    if (role === 'hr') return hrActions.has(action) || managerActions.has(action);
+    return viewerActions.has(action);
+  };
+
+  const todayLogs = (auditLogs as any[])?.filter((log: any) => {
+    const isToday = log.timestamp && log.timestamp.toString().startsWith(today);
+    return isToday && roleFilter({ action: (log.action || '').toLowerCase() });
+  }) || [];
 
   const [demoRole, setDemoRole] = useState<string>('hr');
   useEffect(() => {

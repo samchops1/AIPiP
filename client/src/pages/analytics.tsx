@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -27,6 +29,12 @@ import { useState } from "react";
 export default function Analytics() {
   const [selectedTimeRange, setSelectedTimeRange] = useState("30d");
   const [selectedCompany, setSelectedCompany] = useState("all");
+  const [assumptions, setAssumptions] = useState({
+    avgSalary: 75000,
+    pipCost: 3500,
+    coachingCost: 400,
+    pipSuccessRate: 0.5, // fraction 0..1
+  });
 
   const { data: employees } = useQuery({
     queryKey: ['/api/employees'],
@@ -107,18 +115,19 @@ export default function Analytics() {
     return acc;
   }, { effective: 0, moderate: 0, ineffective: 0, total: 0 }) || { effective: 0, moderate: 0, ineffective: 0, total: 0 };
 
-  // ROI calculations
-  const avgSalary = 75000; // Average salary assumption
-  const terminationCost = avgSalary * 0.5; // 50% of salary cost to replace
-  const pipCost = 5000; // Cost per PIP process
-  const coachingCost = 500; // Cost per coaching session
-  
+  // ROI calculations (explicit, adjustable assumptions)
+  const avgSalary = Math.max(0, Number(assumptions.avgSalary) || 0);
+  const terminationCost = Math.round(avgSalary * 0.5); // replacement + onboarding (~50% salary)
+  const pipCost = Math.max(0, Number(assumptions.pipCost) || 0);
+  const coachingCost = Math.max(0, Number(assumptions.coachingCost) || 0);
+  const assumedPipSuccessRate = Math.min(1, Math.max(0, Number(assumptions.pipSuccessRate) || 0));
+
   const totalTerminationCost = terminated * terminationCost;
-  const totalPipCost = pipEmployees * pipCost;
+  const totalPipCost = (pips as any[])?.length ? (pips as any[]).length * pipCost : pipEmployees * pipCost;
   const totalCoachingCost = (coachingSessions?.length || 0) * coachingCost;
   const totalInvestment = totalPipCost + totalCoachingCost;
-  const costSavings = (pipEmployees * 0.7 * terminationCost) - totalInvestment; // Assuming 70% PIP success rate
-  const roi = totalInvestment > 0 ? ((costSavings / totalInvestment) * 100) : 0;
+  const potentialSavings = (pipEmployees * assumedPipSuccessRate * terminationCost);
+  const roi = totalInvestment > 0 ? (((potentialSavings - totalInvestment) / totalInvestment) * 100) : 0;
 
   const generateReport = () => {
     const reportData = {
@@ -134,7 +143,7 @@ export default function Analytics() {
       companies: companyDistribution,
       roi: {
         investment: totalInvestment,
-        savings: costSavings,
+        savings: Math.round(potentialSavings),
         roi: roi.toFixed(2)
       },
       coaching: coachingStats
@@ -153,13 +162,13 @@ export default function Analytics() {
 
   return (
     <div className="flex-1 p-6 overflow-auto" data-testid="analytics-page">
-      {/* Header */}
+      {/* Header with guidance */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold mb-2">Performance Analytics</h2>
             <p className="text-muted-foreground">
-              Comprehensive insights into workforce performance, PIPs, and coaching effectiveness
+              Comprehensive insights into performance, PIPs, coaching, fairness, and ROI.
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -169,6 +178,63 @@ export default function Analytics() {
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* Assumptions (interactive) */}
+      <div className="mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Assumptions</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-xs text-muted-foreground underline cursor-help">How these affect ROI</span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm">
+                    ROI estimates depend on salary, replacement cost, and the likelihood that PIPs avert terminations. Adjust these inputs to reflect your environment. Values are conservative by default.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div>
+                <label className="text-xs text-muted-foreground">Average Salary ($)</label>
+                <Input type="number" min={0} step={1000} value={assumptions.avgSalary}
+                  onChange={(e) => setAssumptions(a => ({ ...a, avgSalary: Number(e.target.value) }))} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">PIP Cost per Employee ($)</label>
+                <Input type="number" min={0} step={100} value={assumptions.pipCost}
+                  onChange={(e) => setAssumptions(a => ({ ...a, pipCost: Number(e.target.value) }))} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">Coaching Cost per Session ($)</label>
+                <Input type="number" min={0} step={50} value={assumptions.coachingCost}
+                  onChange={(e) => setAssumptions(a => ({ ...a, coachingCost: Number(e.target.value) }))} />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">PIP Success Rate (%)</label>
+                <Input type="number" min={0} max={100} step={5}
+                  value={Math.round(assumptions.pipSuccessRate * 100)}
+                  onChange={(e) => setAssumptions(a => ({ ...a, pipSuccessRate: (Number(e.target.value) || 0) / 100 }))} />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+              <div>
+                Derived replacement cost: <span className="font-medium">${terminationCost.toLocaleString()}</span>
+              </div>
+              <div className="space-x-2">
+                <Badge variant="secondary">Investment: ${totalInvestment.toLocaleString()}</Badge>
+                <Badge variant="secondary">Potential Savings: ${Math.round(potentialSavings).toLocaleString()}</Badge>
+                <Badge variant={roi >= 0 ? 'secondary' : 'destructive'}>ROI: {roi.toFixed(1)}%</Badge>
+                <Button variant="outline" size="sm" onClick={() => setAssumptions({ avgSalary: 75000, pipCost: 3500, coachingCost: 400, pipSuccessRate: 0.5 })}>Reset</Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Key Metrics Overview */}
@@ -239,7 +305,7 @@ export default function Analytics() {
             <div className="mt-2">
               <div className="flex items-center text-xs text-green-600">
                 <TrendingUp className="w-3 h-3 mr-1" />
-                ${costSavings.toLocaleString()} saved
+                ${Math.round(potentialSavings).toLocaleString()} potential savings
               </div>
             </div>
           </CardContent>
@@ -250,7 +316,24 @@ export default function Analytics() {
       <div className="mb-8">
         <Card>
           <CardHeader>
-            <CardTitle>Fairness Snapshot (Weekly)</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center space-x-2">
+                <span>Fairness Snapshot (Weekly)</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs text-muted-foreground underline cursor-help">What is this?</span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      Tracks proposed PIPs and terminations across two synthetic cohorts (A/B) derived from employee IDs. This illustrates fairness monitoring without sensitive attributes. Rates are normalized by cohort size to surface potential imbalances.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </CardTitle>
+              {fairness?.methodology && (
+                <span className="text-xs text-muted-foreground">Method: {fairness.methodology}</span>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {fairness?.report ? (
@@ -259,18 +342,20 @@ export default function Analytics() {
                   <div key={row.cohort} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Cohort {row.cohort}</span>
-                      <span className="text-xs text-muted-foreground">PIPs: {row.pip_rate} • Terms: {row.termination_rate}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {row.pip_count} PIPs ({(row.pip_rate*100).toFixed(1)}%) • {row.termination_count} Terms ({(row.termination_rate*100).toFixed(1)}%) of {row.cohortSize}
+                      </span>
                     </div>
                     <div className="space-y-1">
                       <div className="text-xs">PIP Count</div>
                       <div className="h-2 bg-muted rounded">
-                        <div className="h-2 bg-primary rounded" style={{ width: `${Math.min(100, row.pip_rate * 5)}%` }} />
+                        <div className="h-2 bg-primary rounded" style={{ width: `${Math.min(100, row.pip_rate * 100)}%` }} />
                       </div>
                     </div>
                     <div className="space-y-1">
                       <div className="text-xs">Termination Count</div>
                       <div className="h-2 bg-muted rounded">
-                        <div className="h-2 bg-destructive rounded" style={{ width: `${Math.min(100, row.termination_rate * 5)}%` }} />
+                        <div className="h-2 bg-destructive rounded" style={{ width: `${Math.min(100, row.termination_rate * 100)}%` }} />
                       </div>
                     </div>
                   </div>
