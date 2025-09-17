@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
+import { createHash } from 'crypto';
 
 // Ensure PDF directory exists
 const pdfDir = path.join(process.cwd(), 'generated_pdfs');
@@ -23,7 +23,8 @@ export function generateTerminationPDF(
   const filePath = path.join(pdfDir, fileName);
   
   // Pipe to file
-  doc.pipe(fs.createWriteStream(filePath));
+  const out = fs.createWriteStream(filePath);
+  doc.pipe(out);
   
   // Header
   doc.fontSize(20).text('EMPLOYMENT TERMINATION NOTICE', { align: 'center' });
@@ -83,11 +84,16 @@ export function generateTerminationPDF(
   
   // Finalize PDF and wait for completion
   return new Promise((resolve, reject) => {
-    doc.on('end', () => {
-      const buf = fs.readFileSync(filePath);
-      const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
-      resolve({ filePath, filename: fileName, url: `/api/download-pdf/${fileName}`, sha256 });
+    out.on('finish', () => {
+      try {
+        const buf = fs.readFileSync(filePath);
+        const sha256 = createHash('sha256').update(buf).digest('hex');
+        resolve({ filePath, filename: fileName, url: `/api/download-pdf/${fileName}`, sha256 });
+      } catch (e) {
+        reject(e);
+      }
     });
+    out.on('error', reject);
     doc.on('error', reject);
     doc.end();
   });
@@ -107,7 +113,8 @@ export function generateCoachingPDF(
   const filePath = path.join(pdfDir, fileName);
   
   // Pipe to file
-  doc.pipe(fs.createWriteStream(filePath));
+  const out = fs.createWriteStream(filePath);
+  doc.pipe(out);
   
   // Header with better styling
   doc.fillColor('#1a365d');
@@ -257,11 +264,16 @@ export function generateCoachingPDF(
   
   // Finalize PDF and wait for completion
   return new Promise((resolve, reject) => {
-    doc.on('end', () => {
-      const buf = fs.readFileSync(filePath);
-      const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
-      resolve({ filePath, filename: fileName, url: `/api/download-pdf/${fileName}`, sha256 });
+    out.on('finish', () => {
+      try {
+        const buf = fs.readFileSync(filePath);
+        const sha256 = createHash('sha256').update(buf).digest('hex');
+        resolve({ filePath, filename: fileName, url: `/api/download-pdf/${fileName}`, sha256 });
+      } catch (e) {
+        reject(e);
+      }
     });
+    out.on('error', reject);
     doc.on('error', reject);
     doc.end();
   });
@@ -276,7 +288,8 @@ export function generatePIPPDF(
   const filePath = path.join(pdfDir, fileName);
   
   // Pipe to file
-  doc.pipe(fs.createWriteStream(filePath));
+  const out = fs.createWriteStream(filePath);
+  doc.pipe(out);
   
   // Company Letterhead
   doc.fillColor('#000000');
@@ -502,11 +515,16 @@ export function generatePIPPDF(
   
   // Finalize PDF and wait for completion
   return new Promise((resolve, reject) => {
-    doc.on('end', () => {
-      const buf = fs.readFileSync(filePath);
-      const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
-      resolve({ filePath, filename: fileName, url: `/api/download-pdf/${fileName}`, sha256 });
+    out.on('finish', () => {
+      try {
+        const buf = fs.readFileSync(filePath);
+        const sha256 = createHash('sha256').update(buf).digest('hex');
+        resolve({ filePath, filename: fileName, url: `/api/download-pdf/${fileName}`, sha256 });
+      } catch (e) {
+        reject(e);
+      }
     });
+    out.on('error', reject);
     doc.on('error', reject);
     doc.end();
   });
@@ -523,7 +541,8 @@ export function generateBulkPerformanceReportPDF(
   const filePath = path.join(pdfDir, fileName);
   
   // Pipe to file
-  doc.pipe(fs.createWriteStream(filePath));
+  const out = fs.createWriteStream(filePath);
+  doc.pipe(out);
   
   // Header
   doc.fontSize(20).text('PERFORMANCE MANAGEMENT REPORT', { align: 'center' });
@@ -606,11 +625,16 @@ export function generateBulkPerformanceReportPDF(
   
   // Finalize PDF and wait for completion
   return new Promise((resolve, reject) => {
-    doc.on('end', () => {
-      const buf = fs.readFileSync(filePath);
-      const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
-      resolve({ filePath, filename: fileName, url: `/api/download-pdf/${fileName}`, sha256 });
+    out.on('finish', () => {
+      try {
+        const buf = fs.readFileSync(filePath);
+        const sha256 = createHash('sha256').update(buf).digest('hex');
+        resolve({ filePath, filename: fileName, url: `/api/download-pdf/${fileName}`, sha256 });
+      } catch (e) {
+        reject(e);
+      }
     });
+    out.on('error', reject);
     doc.on('error', reject);
     doc.end();
   });

@@ -59,11 +59,11 @@ export default function CoachingSystem() {
 
   const generateCoachingMutation = useMutation({
     mutationFn: async ({ employeeId, score }: any) => {
-      const response = await apiRequest("POST", "/api/generate-coaching", {
+      const data = await apiRequest("POST", "/api/generate-coaching", {
         employeeId,
         score: parseFloat(score)
       });
-      return response.json();
+      return data;
     },
     onSuccess: (data, variables) => {
       const employee = (employees as any[])?.find((e: any) => e.id === variables.employeeId);
@@ -156,12 +156,12 @@ export default function CoachingSystem() {
       for (const pip of (activePips as any[]) || []) {
         const latestScore = getEmployeeLatestScore(pip.employeeId);
         if (latestScore) {
-          const response = await apiRequest("POST", "/api/generate-coaching", {
+          const data = await apiRequest("POST", "/api/generate-coaching", {
             employeeId: pip.employeeId,
             score: latestScore,
             pipId: pip.id
           });
-          results.push(await response.json());
+          results.push(data);
         }
       }
       return results;
@@ -195,8 +195,15 @@ export default function CoachingSystem() {
           <div className="flex space-x-2">
             <Button 
               variant="outline"
-              onClick={() => autoGenerateCoachingForPips.mutate()}
-              disabled={autoGenerateCoachingForPips.isPending || !activePips || activePips.length === 0}
+              onClick={() => {
+                const role = typeof window !== 'undefined' ? (window.localStorage.getItem('demoRole') || 'viewer') : 'viewer';
+                if (role !== 'manager') {
+                  toast({ title: 'Insufficient Role', description: 'Bulk coaching requires manager role.', variant: 'destructive' });
+                  return;
+                }
+                autoGenerateCoachingForPips.mutate();
+              }}
+              disabled={autoGenerateCoachingForPips.isPending || !activePips || (activePips as any[])?.length === 0}
               data-testid="button-bulk-coaching"
             >
               <MessageSquare className="w-4 h-4 mr-2" />
@@ -367,7 +374,7 @@ export default function CoachingSystem() {
                         </div>
                       </div>
                       
-                      <p className="text-sm leading-relaxed">{session.feedback}</p>
+                      <FeedbackRenderer text={session.feedback} />
                       
                       {session.pipId && (
                         <div className="mt-2 p-2 bg-destructive/5 rounded border border-destructive/20">
@@ -398,6 +405,41 @@ export default function CoachingSystem() {
           feedback={modalData.feedback}
         />
       )}
+    </div>
+  );
+}
+
+function FeedbackRenderer({ text }: { text: string }) {
+  if (!text) return null;
+  // Normalize line endings and collapse excessive whitespace
+  const cleaned = text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  const paragraphs = cleaned.split(/\n\n+/);
+
+  return (
+    <div className="space-y-2 text-sm leading-relaxed">
+      {paragraphs.map((para, idx) => {
+        // Bullet list if lines start with • or -
+        const lines = para.split(/\n/).map(l => l.trim()).filter(Boolean);
+        const isList = lines.every(l => /^[-•]/.test(l)) && lines.length > 1;
+        const isHeading = /^[A-Z][A-Za-z\s/&]+:\s*$/.test(para);
+
+        if (isHeading) {
+          return <div key={idx} className="font-medium text-muted-foreground uppercase tracking-wide">{para.replace(/:$/, '')}</div>;
+        }
+        if (isList) {
+          return (
+            <ul key={idx} className="list-disc pl-5 space-y-1">
+              {lines.map((l, i) => (
+                <li key={i}>{l.replace(/^[-•]\s*/, '')}</li>
+              ))}
+            </ul>
+          );
+        }
+        // Default paragraph, preserve soft line breaks
+        return (
+          <p key={idx} className="whitespace-pre-wrap">{para}</p>
+        );
+      })}
     </div>
   );
 }

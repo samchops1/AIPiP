@@ -35,6 +35,7 @@ const createPipSchema = z.object({
 
 export default function PipManagement() {
   const [selectedPip, setSelectedPip] = useState<any>(null);
+  const [showPipDetails, setShowPipDetails] = useState(false);
   const [showCreatePipModal, setShowCreatePipModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -54,12 +55,12 @@ export default function PipManagement() {
 
   const generateCoachingMutation = useMutation({
     mutationFn: async ({ employeeId, score, pipId }: any) => {
-      const response = await apiRequest("POST", "/api/generate-coaching", {
+      const data = await apiRequest("POST", "/api/generate-coaching", {
         employeeId,
         score,
         pipId
       });
-      return response.json();
+      return data;
     },
     onSuccess: () => {
       toast({
@@ -442,7 +443,7 @@ export default function PipManagement() {
                       size="sm" 
                       variant="outline" 
                       className="flex-1"
-                      onClick={() => setSelectedPip(pip)}
+                      onClick={() => { setSelectedPip(pip); setShowPipDetails(true); }}
                       data-testid={`button-view-details-${pip.id}`}
                     >
                       View Details
@@ -458,11 +459,18 @@ export default function PipManagement() {
                     <Button 
                       size="sm" 
                       variant="outline"
-                      onClick={() => generateCoachingMutation.mutate({
-                        employeeId: pip.employeeId,
-                        score: pip.currentScore || pip.initialScore || 60,
-                        pipId: pip.id
-                      })}
+                      onClick={() => {
+                        const role = typeof window !== 'undefined' ? (window.localStorage.getItem('demoRole') || 'viewer') : 'viewer';
+                        if (role !== 'manager') {
+                          toast({ title: 'Insufficient Role', description: 'Generating coaching requires manager role.', variant: 'destructive' });
+                          return;
+                        }
+                        generateCoachingMutation.mutate({
+                          employeeId: pip.employeeId,
+                          score: pip.currentScore || pip.initialScore || 60,
+                          pipId: pip.id
+                        });
+                      }}
                       disabled={generateCoachingMutation.isPending}
                       data-testid={`button-coaching-${pip.id}`}
                     >
@@ -476,33 +484,41 @@ export default function PipManagement() {
         </div>
       )}
 
+      {/* PIP Details Modal */}
       {selectedPip && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>PIP Details - {getEmployeeName(selectedPip.employeeId)}</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Dialog open={showPipDetails} onOpenChange={setShowPipDetails}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>PIP Details - {getEmployeeName(selectedPip.employeeId)}</DialogTitle>
+              <DialogDescription>
+                Review goals and the coaching plan for this PIP.
+              </DialogDescription>
+            </DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="font-medium mb-2">Goals</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  {selectedPip.goals.map((goal: string, index: number) => (
-                    <li key={index}>• {goal}</li>
-                  ))}
-                </ul>
+                {Array.isArray(selectedPip.goals) ? (
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    {selectedPip.goals.map((goal: string, index: number) => (
+                      <li key={index}>• {goal}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{String(selectedPip.goals)}</p>
+                )}
               </div>
               <div>
                 <h4 className="font-medium mb-2">Coaching Plan</h4>
-                <p className="text-sm text-muted-foreground">{selectedPip.coachingPlan}</p>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedPip.coachingPlan}</p>
               </div>
             </div>
             <div className="mt-4 flex justify-end">
-              <Button variant="outline" onClick={() => setSelectedPip(null)}>
+              <Button variant="outline" onClick={() => { setShowPipDetails(false); setSelectedPip(null); }}>
                 Close
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function Dashboard() {
   const { toast } = useToast();
   const [showAutoFiringModal, setShowAutoFiringModal] = useState(false);
-  const [terminatedEmployeesData, setTerminatedEmployeesData] = useState([]);
+  const [terminatedEmployeesData, setTerminatedEmployeesData] = useState<any[]>([]);
   const [showTerminatedModal, setShowTerminatedModal] = useState(false);
   const [selectedTerminatedEmployee, setSelectedTerminatedEmployee] = useState(null);
 
@@ -92,10 +92,7 @@ export default function Dashboard() {
         await new Promise(resolve => setTimeout(resolve, 500));
         
         // Fetch all terminated employees to show in modal, not just newly terminated ones
-        const allTerminated = await apiRequest('GET', '/api/terminated-employees');
-        console.log('Fetched terminated employees:', allTerminated);
-        console.log('Is array?', Array.isArray(allTerminated));
-        console.log('Length:', allTerminated?.length);
+        const allTerminated: any[] = await apiRequest('GET', '/api/terminated-employees');
         
         // Transform the data structure to match what AutoFiringModal expects
         const transformedEmployees = Array.isArray(allTerminated) ? allTerminated.map((emp: any) => ({
@@ -108,8 +105,6 @@ export default function Dashboard() {
           terminationLetter: emp.terminationLetter
         })) : [];
         
-        console.log('Transformed employees:', transformedEmployees);
-        console.log('Setting terminated employees data:', transformedEmployees.length);
         setTerminatedEmployeesData(transformedEmployees);
         setShowAutoFiringModal(true); // Open modal after successful data fetch
       } catch (error) {
