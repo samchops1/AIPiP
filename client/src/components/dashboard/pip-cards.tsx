@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -29,15 +30,17 @@ export default function PipCards({ pips, isLoading }: PipCardsProps) {
   const [showCoachingModal, setShowCoachingModal] = useState(false);
   const [coachingEmployee, setCoachingEmployee] = useState<any>(null);
   const [coachingFeedback, setCoachingFeedback] = useState('');
+  const [selectedPip, setSelectedPip] = useState<any>(null);
+  const [showPipDetails, setShowPipDetails] = useState(false);
 
   const generateCoachingMutation = useMutation({
     mutationFn: async ({ employeeId, score, pipId }: any) => {
-      const response = await apiRequest("POST", "/api/generate-coaching", {
+      const data = await apiRequest("POST", "/api/generate-coaching", {
         employeeId,
         score,
         pipId
       });
-      return response.json();
+      return data;
     },
     onSuccess: (data, { employeeId, score, pipId }) => {
       // Find the employee data
@@ -227,8 +230,8 @@ export default function PipCards({ pips, isLoading }: PipCardsProps) {
                       <Button 
                         size="sm" 
                         variant="outline" 
-                        className="flex-1"
-                        onClick={() => setLocation('/pips')}
+                      className="flex-1"
+                        onClick={() => { setSelectedPip(pip); setShowPipDetails(true); }}
                         data-testid={`button-view-pip-details-${pip.id}`}
                       >
                         View Details
@@ -264,6 +267,43 @@ export default function PipCards({ pips, isLoading }: PipCardsProps) {
         employee={coachingEmployee}
         feedback={coachingFeedback}
       />
+    )}
+
+    {/* PIP Details Modal */}
+    {selectedPip && (
+      <Dialog open={showPipDetails} onOpenChange={setShowPipDetails}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>PIP Details - {selectedPip.employeeName || `Employee ${selectedPip.employeeId}`}</DialogTitle>
+            <DialogDescription>
+              Review goals and the coaching plan for this PIP.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-medium mb-2">Goals</h4>
+              {Array.isArray(selectedPip.goals) ? (
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  {selectedPip.goals.map((goal: string, index: number) => (
+                    <li key={index}>• {goal}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{String(selectedPip.goals)}</p>
+              )}
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Coaching Plan</h4>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedPip.coachingPlan}</p>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button variant="outline" onClick={() => { setShowPipDetails(false); setSelectedPip(null); }}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     )}
     </>
   );

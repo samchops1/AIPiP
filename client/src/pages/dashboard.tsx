@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import MetricsCards from "@/components/dashboard/metrics-cards";
 import EmployeeTable from "@/components/dashboard/employee-table";
@@ -7,6 +7,7 @@ import PipCards from "@/components/dashboard/pip-cards";
 import AutoFiringModal from "@/components/modals/auto-firing-modal";
 import TerminatedEmployeeModal from "@/components/modals/terminated-employee-modal";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Upload, FileText, Database, Trash2, AlertTriangle, Users } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -18,6 +19,20 @@ export default function Dashboard() {
   const [terminatedEmployeesData, setTerminatedEmployeesData] = useState<any[]>([]);
   const [showTerminatedModal, setShowTerminatedModal] = useState(false);
   const [selectedTerminatedEmployee, setSelectedTerminatedEmployee] = useState(null);
+  const [role, setRole] = useState<string>(() => (typeof window !== 'undefined' ? (window.localStorage.getItem('demoRole') || 'viewer') : 'viewer'));
+
+  useEffect(() => {
+    const updateRole = (e: any) => setRole(e?.detail || (window.localStorage.getItem('demoRole') || 'viewer'));
+    const storageListener = () => setRole(window.localStorage.getItem('demoRole') || 'viewer');
+    window.addEventListener('demoRoleChanged', updateRole as any);
+    window.addEventListener('storage', storageListener);
+    // initial sync
+    setRole(window.localStorage.getItem('demoRole') || 'viewer');
+    return () => {
+      window.removeEventListener('demoRoleChanged', updateRole as any);
+      window.removeEventListener('storage', storageListener);
+    };
+  }, []);
 
   const { data: dashboardMetrics, isLoading: metricsLoading } = useQuery({
     queryKey: ['/api/dashboard-metrics'],
@@ -156,7 +171,19 @@ export default function Dashboard() {
           {/* Sample Data Widget */}
           <div className="bg-card rounded-lg border border-border">
             <div className="p-4 border-b border-border">
-              <h3 className="font-semibold">Sample Data</h3>
+              <h3 className="font-semibold flex items-center">
+                <span>Sample Data</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="ml-2 text-xs underline cursor-help text-muted-foreground">What is this?</span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      Generates a realistic demo dataset (employees, metrics, PIPs, sessions) so you can explore features quickly. Safe to run multiple times; use Clear to reset.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </h3>
             </div>
             <div className="p-4 space-y-3">
               <div className="text-center">
@@ -165,6 +192,7 @@ export default function Dashboard() {
                   Generate realistic demo data to explore the system
                 </p>
                 <div className="flex flex-col gap-2">
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild>
                   <Button 
                     size="sm" 
                     onClick={() => generateSampleDataMutation.mutate()}
@@ -174,6 +202,7 @@ export default function Dashboard() {
                     <Database className="w-4 h-4 mr-2" />
                     Generate Sample Data
                   </Button>
+                  </TooltipTrigger><TooltipContent>Creates demo records to populate the dashboard.</TooltipContent></Tooltip></TooltipProvider>
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -198,6 +227,16 @@ export default function Dashboard() {
               <h3 className="font-semibold flex items-center">
                 <AlertTriangle className="w-4 h-4 mr-2 text-orange-500" />
                 Auto-Firing System
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="ml-2 text-xs underline cursor-help text-muted-foreground">How it works</span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      Demonstrates automated termination based on consecutive low performance/utilization. HR role required.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </h3>
             </div>
             <div className="p-4 space-y-3">
@@ -206,16 +245,22 @@ export default function Dashboard() {
                 <p className="text-sm text-muted-foreground mb-3">
                   Demonstrate automated termination based on performance and utilization
                 </p>
-                <Button 
-                  variant="destructive"
-                  size="sm" 
-                  onClick={() => autoFireMutation.mutate()}
-                  disabled={autoFireMutation.isPending}
-                  data-testid="button-auto-fire"
-                >
-                  <AlertTriangle className="w-4 h-4 mr-2" />
-                  Execute Auto-Firing
-                </Button>
+                {role === 'hr' ? (
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                  <Button 
+                    variant="destructive"
+                    size="sm" 
+                    onClick={() => autoFireMutation.mutate()}
+                    disabled={autoFireMutation.isPending}
+                    data-testid="button-auto-fire"
+                  >
+                    <AlertTriangle className="w-4 h-4 mr-2" />
+                    Execute Auto-Firing
+                  </Button>
+                  </TooltipTrigger><TooltipContent>Runs the evaluation and shows who would be terminated.</TooltipContent></Tooltip></TooltipProvider>
+                ) : (
+                  <div className="text-xs text-muted-foreground">HR role required to execute</div>
+                )}
               </div>
               <div className="text-xs text-muted-foreground">
                 Evaluates employees with consistent poor performance and low utilization
@@ -229,6 +274,16 @@ export default function Dashboard() {
               <h3 className="font-semibold flex items-center">
                 <Users className="w-4 h-4 mr-2 text-red-500" />
                 Terminated Employees ({(terminatedEmployees as any[])?.length || 0})
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="ml-2 text-xs underline cursor-help text-muted-foreground">What is this?</span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      Shows employees terminated by the automated evaluation or manual processes. Click a row to view the termination letter and details.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </h3>
             </div>
             <div className="p-4 space-y-3">
@@ -272,7 +327,19 @@ export default function Dashboard() {
           {/* Quick Data Upload Widget */}
           <div className="bg-card rounded-lg border border-border">
             <div className="p-4 border-b border-border">
-              <h3 className="font-semibold">Quick Data Upload</h3>
+              <h3 className="font-semibold flex items-center">
+                <span>Quick Data Upload</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="ml-2 text-xs underline cursor-help text-muted-foreground">How to use</span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      Upload a CSV with employee metrics to evaluate PIPs on real data. Columns: employee_id, period, score, utilization, tasks_completed, date.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </h3>
             </div>
             <div className="p-4">
               <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">

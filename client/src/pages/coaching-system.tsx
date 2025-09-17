@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -193,6 +194,7 @@ export default function CoachingSystem() {
             </p>
           </div>
           <div className="flex space-x-2">
+            <TooltipProvider><Tooltip><TooltipTrigger asChild>
             <Button 
               variant="outline"
               onClick={() => {
@@ -209,6 +211,7 @@ export default function CoachingSystem() {
               <MessageSquare className="w-4 h-4 mr-2" />
               Generate for PIPs ({(activePips as any[])?.length || 0})
             </Button>
+            </TooltipTrigger><TooltipContent>Creates an automated coaching session for each active PIP using latest scores.</TooltipContent></Tooltip></TooltipProvider>
           </div>
         </div>
       </div>
@@ -357,6 +360,7 @@ export default function CoachingSystem() {
                           )}
                         </div>
                         <div className="flex items-center space-x-2">
+                          <TooltipProvider><Tooltip><TooltipTrigger asChild>
                           <Button
                             size="sm"
                             variant="outline"
@@ -367,6 +371,7 @@ export default function CoachingSystem() {
                             <Download className="w-3 h-3 mr-1" />
                             PDF
                           </Button>
+                          </TooltipTrigger><TooltipContent>Download a PDF report of this coaching session.</TooltipContent></Tooltip></TooltipProvider>
                           <div className="flex items-center text-xs text-muted-foreground">
                             <Calendar className="w-3 h-3 mr-1" />
                             {session.date}

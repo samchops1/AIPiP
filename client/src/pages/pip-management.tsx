@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
@@ -192,12 +193,7 @@ export default function PipManagement() {
 
   return (
     <div className="flex-1 p-6 overflow-auto" data-testid="pip-management-page">
-      {/* Policy/Error Banners for termination gating */}
-      <div className="mb-4 space-y-2">
-        <div className="text-xs text-muted-foreground">
-          Note: Termination evaluation requires legal and HR signoff and is blocked in DRY_RUN mode.
-        </div>
-      </div>
+      {/* Policy notice intentionally minimal for demo */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
@@ -439,6 +435,7 @@ export default function PipManagement() {
                   )}
 
                   <div className="flex items-center space-x-2 pt-2">
+                    <TooltipProvider><Tooltip><TooltipTrigger asChild>
                     <Button 
                       size="sm" 
                       variant="outline" 
@@ -448,6 +445,8 @@ export default function PipManagement() {
                     >
                       View Details
                     </Button>
+                    </TooltipTrigger><TooltipContent>Open goals and coaching plan for this PIP.</TooltipContent></Tooltip></TooltipProvider>
+                    <TooltipProvider><Tooltip><TooltipTrigger asChild>
                     <Button 
                       size="sm" 
                       variant="outline"
@@ -456,6 +455,8 @@ export default function PipManagement() {
                     >
                       <Download className="w-4 h-4" />
                     </Button>
+                    </TooltipTrigger><TooltipContent>Download the PIP as a PDF for records.</TooltipContent></Tooltip></TooltipProvider>
+                    <TooltipProvider><Tooltip><TooltipTrigger asChild>
                     <Button 
                       size="sm" 
                       variant="outline"
@@ -476,6 +477,7 @@ export default function PipManagement() {
                     >
                       <MessageSquare className="w-4 h-4" />
                     </Button>
+                    </TooltipTrigger><TooltipContent>Generate actionable coaching guidance for this employee.</TooltipContent></Tooltip></TooltipProvider>
                   </div>
                 </CardContent>
               </Card>

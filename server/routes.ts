@@ -934,7 +934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Auto-firing demonstration endpoint
-  app.post("/api/auto-fire/demo", requireRole("manager", "hr"), requireNotDryRun, async (req, res) => {
+  app.post("/api/auto-fire/demo", requireRole("hr"), requireNotDryRun, async (req, res) => {
     try {
       const settings = await storage.getSystemSettings();
       
@@ -1150,7 +1150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Auto-firing evaluation endpoint
-  app.post('/api/evaluate-terminations', requireRole("manager", "hr"), requireNotDryRun, async (req, res) => {
+  app.post('/api/evaluate-terminations', requireRole("hr"), requireNotDryRun, async (req, res) => {
     try {
       // Legal/HR gate
       const { legal_signoff, hr_signoff, risk_flags = [] } = req.body || {};
@@ -2202,6 +2202,8 @@ async function generateSampleData(storage: any) {
     improvementRequired: 15,
     status: "active"
   });
+  // Ensure employee status reflects active PIP for analytics/UI
+  await storage.updateEmployee("emp-004", { status: "pip" });
 
   // Create sample coaching sessions
   await storage.createCoachingSession({
@@ -2282,6 +2284,8 @@ async function generateSampleData(storage: any) {
       improvementRequired: 15,
       status: "active"
     });
+    // Reflect PIP membership on employee record for dashboards/analytics
+    await storage.updateEmployee(pipEmp.id, { status: "pip" });
     
     // Generate PIP PDF
     await generatePIPPDF(pip, pipEmp);

@@ -31,9 +31,11 @@ export default function Analytics() {
   const [selectedCompany, setSelectedCompany] = useState("all");
   const [assumptions, setAssumptions] = useState({
     avgSalary: 75000,
-    pipCost: 3500,
-    coachingCost: 400,
-    pipSuccessRate: 0.5, // fraction 0..1
+    // AI-native process: mostly review + workflow time
+    pipCost: 500,          // per PIP (review + admin)
+    // Token + compute based: cents per session
+    coachingCost: 0.2,     // per automated coaching session
+    pipSuccessRate: 0.6,   // fraction 0..1 (conservative, but positive)
   });
 
   const { data: employees } = useQuery({
@@ -212,7 +214,7 @@ export default function Analytics() {
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Coaching Cost per Session ($)</label>
-                <Input type="number" min={0} step={50} value={assumptions.coachingCost}
+                <Input type="number" min={0} step={0.05} value={assumptions.coachingCost}
                   onChange={(e) => setAssumptions(a => ({ ...a, coachingCost: Number(e.target.value) }))} />
               </div>
               <div>
@@ -230,7 +232,7 @@ export default function Analytics() {
                 <Badge variant="secondary">Investment: ${totalInvestment.toLocaleString()}</Badge>
                 <Badge variant="secondary">Potential Savings: ${Math.round(potentialSavings).toLocaleString()}</Badge>
                 <Badge variant={roi >= 0 ? 'secondary' : 'destructive'}>ROI: {roi.toFixed(1)}%</Badge>
-                <Button variant="outline" size="sm" onClick={() => setAssumptions({ avgSalary: 75000, pipCost: 3500, coachingCost: 400, pipSuccessRate: 0.5 })}>Reset</Button>
+                <Button variant="outline" size="sm" onClick={() => setAssumptions({ avgSalary: 75000, pipCost: 500, coachingCost: 0.2, pipSuccessRate: 0.6 })}>Reset</Button>
               </div>
             </div>
           </CardContent>
@@ -243,7 +245,9 @@ export default function Analytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Employees</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><span>Total Employees</span></TooltipTrigger><TooltipContent>Headcount across all companies in scope.</TooltipContent></Tooltip></TooltipProvider>
+                </p>
                 <p className="text-2xl font-bold">{totalEmployees.toLocaleString()}</p>
               </div>
               <Users className="w-8 h-8 text-primary" />
@@ -261,7 +265,9 @@ export default function Analytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Active PIPs</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><span>Active PIPs</span></TooltipTrigger><TooltipContent>Employees currently on Performance Improvement Plans.</TooltipContent></Tooltip></TooltipProvider>
+                </p>
                 <p className="text-2xl font-bold">{pipEmployees}</p>
               </div>
               <Target className="w-8 h-8 text-orange-500" />
@@ -279,7 +285,9 @@ export default function Analytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Terminations</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><span>Terminations</span></TooltipTrigger><TooltipContent>Employees offboarded during the selected period.</TooltipContent></Tooltip></TooltipProvider>
+                </p>
                 <p className="text-2xl font-bold">{terminated}</p>
               </div>
               <AlertTriangle className="w-8 h-8 text-destructive" />
@@ -297,7 +305,9 @@ export default function Analytics() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">ROI</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><span>ROI</span></TooltipTrigger><TooltipContent>Potential ROI based on assumptions below and current PIP activity.</TooltipContent></Tooltip></TooltipProvider>
+                </p>
                 <p className="text-2xl font-bold">{roi.toFixed(1)}%</p>
               </div>
               <DollarSign className="w-8 h-8 text-green-500" />
@@ -457,11 +467,11 @@ export default function Analytics() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{Math.round(pipEmployees * 0.7)}</div>
+                    <div className="text-2xl font-bold text-green-600">{Math.max(0, Math.round(pipEmployees * assumedPipSuccessRate))}</div>
                     <div className="text-xs text-green-600">Expected Success</div>
                   </div>
                   <div className="text-center p-4 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{Math.round(pipEmployees * 0.3)}</div>
+                    <div className="text-2xl font-bold text-red-600">{Math.max(0, pipEmployees - Math.round(pipEmployees * assumedPipSuccessRate))}</div>
                     <div className="text-xs text-red-600">At Risk</div>
                   </div>
                 </div>
@@ -476,7 +486,7 @@ export default function Analytics() {
 
                 <div className="border-t pt-4">
                   <div className="text-xs text-muted-foreground">
-                    Historical data shows {improvementRate}% of employees on PIPs successfully improve their performance
+                    Projection uses the current success rate assumption ({Math.round(assumedPipSuccessRate*100)}%) and live counts of PIPs.
                   </div>
                 </div>
               </CardContent>
@@ -709,13 +719,13 @@ export default function Analytics() {
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Termination Costs Avoided</span>
                     <span className="font-medium text-green-600">
-                      ${(pipEmployees * 0.7 * terminationCost).toLocaleString()}
+                      {Math.round(potentialSavings).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Net Savings</span>
                     <span className="font-bold text-green-600">
-                      ${costSavings.toLocaleString()}
+                      {(Math.round(potentialSavings) - totalInvestment).toLocaleString()}
                     </span>
                   </div>
                 </div>

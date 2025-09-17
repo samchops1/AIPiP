@@ -50,6 +50,8 @@ export default function Header() {
     setDemoRole(role);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('demoRole', role);
+      // Notify other components in-app
+      window.dispatchEvent(new CustomEvent('demoRoleChanged', { detail: role }));
     }
     toast({ title: 'Role updated', description: `Demo role set to ${role}` });
   };
