@@ -27,6 +27,8 @@ export default function CoachingSystem() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showCoachingModal, setShowCoachingModal] = useState(false);
   const [modalData, setModalData] = useState<any>(null);
+  const [onlyEligible, setOnlyEligible] = useState(false);
+  const [onlyPip, setOnlyPip] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -45,6 +47,10 @@ export default function CoachingSystem() {
 
   const { data: performanceMetrics } = useQuery({
     queryKey: ['/api/performance-metrics'],
+  });
+
+  const { data: terminatedEmployees } = useQuery({
+    queryKey: ['/api/terminated-employees'],
   });
 
   const { data: coachingSessions, isLoading: sessionsLoading } = useQuery({
@@ -91,10 +97,17 @@ export default function CoachingSystem() {
     },
   });
 
-  const filteredEmployees = (employees as any[])?.filter((employee: any) =>
-    employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    employee.id.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const terminatedSet = new Set(((terminatedEmployees as any[]) || []).map((e: any) => e.employeeId));
+  const hasRecentMetric = (empId: string) => (performanceMetrics as any[])?.some((m: any) => m.employeeId === empId);
+  const isOnPip = (empId: string) => ((activePips as any[]) || []).some((p: any) => p.employeeId === empId);
+
+  const filteredEmployees = ((employees as any[]) || [])
+    .filter((employee: any) =>
+      employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee.id.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .filter((employee: any) => (onlyEligible ? (!terminatedSet.has(employee.id) && hasRecentMetric(employee.id)) : true))
+    .filter((employee: any) => (onlyPip ? isOnPip(employee.id) : true));
 
   const getEmployeeName = (employeeId: string) => {
     const employee = (employees as any[])?.find((e: any) => e.id === employeeId);
@@ -153,24 +166,37 @@ export default function CoachingSystem() {
 
   const autoGenerateCoachingForPips = useMutation({
     mutationFn: async () => {
-      const results = [];
-      for (const pip of (activePips as any[]) || []) {
+      const results: any[] = [];
+      let skipped = 0;
+      let skippedTerminated = 0;
+      let skippedNoMetrics = 0;
+      const list = (activePips as any[]) || [];
+
+      const terminatedSet = new Set(((terminatedEmployees as any[]) || []).map((e: any) => e.employeeId));
+      const eligible = list.filter((pip: any) => !terminatedSet.has(pip.employeeId));
+
+      for (const pip of eligible) {
         const latestScore = getEmployeeLatestScore(pip.employeeId);
-        if (latestScore) {
+        if (!latestScore && latestScore !== 0) { skipped++; skippedNoMetrics++; continue; }
+        try {
           const data = await apiRequest("POST", "/api/generate-coaching", {
             employeeId: pip.employeeId,
             score: latestScore,
             pipId: pip.id
           });
           results.push(data);
+        } catch (e) {
+          // Skip errors per-employee (e.g., role/eligibility), continue others
+          skipped++;
+          if (terminatedSet.has(pip.employeeId)) skippedTerminated++;
         }
       }
-      return results;
+      return { results, skipped, skippedTerminated, skippedNoMetrics, total: list.length, eligible: eligible.length };
     },
-    onSuccess: (results) => {
+    onSuccess: ({ results, skipped, skippedTerminated, skippedNoMetrics, eligible }: any) => {
       toast({
         title: "Bulk Coaching Generated",
-        description: `Generated coaching sessions for ${results.length} PIP employees.`,
+        description: `Eligible: ${eligible} • Success: ${results.length} • Skipped: ${skipped}${skipped ? ` (terminated: ${skippedTerminated}, no metrics: ${skippedNoMetrics})` : ''}`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/coaching-sessions'] });
     },
@@ -226,6 +252,16 @@ export default function CoachingSystem() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={onlyEligible} onChange={(e) => setOnlyEligible(e.target.checked)} />
+                Show eligible only
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={onlyPip} onChange={(e) => setOnlyPip(e.target.checked)} />
+                Only employees on PIP
+              </label>
+            </div>
             <div>
               <Label htmlFor="employee-search">Search Employees</Label>
               <div className="relative">

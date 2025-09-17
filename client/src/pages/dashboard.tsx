@@ -19,15 +19,15 @@ export default function Dashboard() {
   const [terminatedEmployeesData, setTerminatedEmployeesData] = useState<any[]>([]);
   const [showTerminatedModal, setShowTerminatedModal] = useState(false);
   const [selectedTerminatedEmployee, setSelectedTerminatedEmployee] = useState(null);
-  const [role, setRole] = useState<string>(() => (typeof window !== 'undefined' ? (window.localStorage.getItem('demoRole') || 'viewer') : 'viewer'));
+  const [role, setRole] = useState<string>(() => (typeof window !== 'undefined' ? (window.localStorage.getItem('demoRole') || 'hr') : 'hr'));
 
   useEffect(() => {
     const updateRole = (e: any) => setRole(e?.detail || (window.localStorage.getItem('demoRole') || 'viewer'));
-    const storageListener = () => setRole(window.localStorage.getItem('demoRole') || 'viewer');
+    const storageListener = () => setRole(window.localStorage.getItem('demoRole') || 'hr');
     window.addEventListener('demoRoleChanged', updateRole as any);
     window.addEventListener('storage', storageListener);
     // initial sync
-    setRole(window.localStorage.getItem('demoRole') || 'viewer');
+    setRole(window.localStorage.getItem('demoRole') || 'hr');
     return () => {
       window.removeEventListener('demoRoleChanged', updateRole as any);
       window.removeEventListener('storage', storageListener);

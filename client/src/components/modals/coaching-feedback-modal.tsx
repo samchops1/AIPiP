@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { User, MessageSquare, TrendingUp, CheckCircle, Download } from "lucide-react";
 // @ts-ignore
 import jsPDF from 'jspdf';
+import { apiRequest } from "@/lib/queryClient";
 
 interface CoachingFeedbackModalProps {
   isOpen: boolean;
@@ -32,19 +33,11 @@ export default function CoachingFeedbackModal({
 
   const generateCoachingPDF = async () => {
     try {
-      const response = await fetch('/api/generate-coaching', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          employeeId: employee.id,
-          score: employee.score,
-          pipId: employee.pipId || null
-        })
+      await apiRequest('POST', '/api/generate-coaching', {
+        employeeId: employee.id,
+        score: employee.score,
+        pipId: employee.pipId || null,
       });
-      
-      if (response.ok) {
-        console.log('Coaching PDF generated successfully');
-      }
     } catch (error) {
       console.error('Failed to generate coaching PDF:', error);
     }
@@ -114,12 +107,14 @@ export default function CoachingFeedbackModal({
             if (newStep === steps.length - 1) {
               setTimeout(async () => {
                 setShowFeedback(true);
+                setProgress(100);
                 // Generate PDF after completion
                 await generateCoachingPDF();
               }, 500);
             }
             return newStep;
           }
+          setProgress(100);
           clearInterval(timer);
           return prev;
         });

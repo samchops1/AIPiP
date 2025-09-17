@@ -59,13 +59,15 @@ export default function Analytics() {
   });
 
   const { data: coachingSessions } = useQuery({
-    queryKey: ['/api/coaching-sessions'],
-    select: (data) => data?.filter((session: any) => session.type === 'automated') || []
+    queryKey: ['/api/coaching-sessions/all'],
   });
+  const automatedSessions = (coachingSessions as any[])?.filter((s: any) => s.type === 'automated') || [];
 
   const { data: fairness } = useQuery({
     queryKey: ['/api/reports/fairness/weekly'],
   });
+
+  // Client-driven ROI only (server ROI endpoints are demo-only, not used for interview)
 
   // Calculate analytics
   const totalEmployees = employees?.length || 0;
@@ -108,7 +110,7 @@ export default function Analytics() {
   };
 
   // Coaching effectiveness
-  const coachingStats = coachingSessions?.reduce((acc: any, session: any) => {
+  const coachingStats = (coachingSessions as any[])?.reduce((acc: any, session: any) => {
     const score = session.score;
     if (score >= 80) acc.effective++;
     else if (score >= 60) acc.moderate++;
@@ -162,6 +164,36 @@ export default function Analytics() {
     URL.revokeObjectURL(url);
   };
 
+  const exportCsv = () => {
+    const rows: Array<Record<string, any>> = [];
+    rows.push({ metric: 'total_employees', value: totalEmployees });
+    rows.push({ metric: 'active_employees', value: activeEmployees });
+    rows.push({ metric: 'pip_employees', value: pipEmployees });
+    rows.push({ metric: 'terminated', value: terminated });
+    rows.push({ metric: 'avg_salary', value: avgSalary });
+    rows.push({ metric: 'termination_cost', value: terminationCost });
+    rows.push({ metric: 'pip_cost', value: pipCost });
+    rows.push({ metric: 'coaching_cost', value: coachingCost });
+    rows.push({ metric: 'pip_success_rate', value: assumedPipSuccessRate });
+    rows.push({ metric: 'num_pips', value: (pips as any[])?.length || pipEmployees });
+    rows.push({ metric: 'num_coaching_sessions', value: (coachingSessions?.length || 0) });
+    rows.push({ metric: 'savings', value: Math.round(potentialSavings) });
+    rows.push({ metric: 'investment', value: totalInvestment });
+    rows.push({ metric: 'roi_percent', value: roi.toFixed(2) });
+
+    const header = ['metric', 'value'];
+    const csv = [header.join(',')].concat(rows.map(r => `${r.metric},${r.value}`)).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `analytics-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex-1 p-6 overflow-auto" data-testid="analytics-page">
       {/* Header with guidance */}
@@ -176,7 +208,11 @@ export default function Analytics() {
           <div className="flex items-center space-x-3">
             <Button variant="outline" onClick={generateReport}>
               <Download className="w-4 h-4 mr-2" />
-              Export Report
+              Export JSON
+            </Button>
+            <Button variant="outline" onClick={exportCsv}>
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
             </Button>
           </div>
         </div>
@@ -348,8 +384,8 @@ export default function Analytics() {
           <CardContent>
             {fairness?.report ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {fairness.report.map((row: any) => (
-                  <div key={row.cohort} className="space-y-2">
+                {fairness.report.map((row: any, idx: number) => (
+                  <div key={`cohort-${row.cohort}-${idx}`} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Cohort {row.cohort}</span>
                       <span className="text-xs text-muted-foreground">
@@ -393,9 +429,9 @@ export default function Analytics() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <BarChart3 className="w-5 h-5 mr-2" />
-                  Performance Distribution
+                <CardTitle className="flex items-center space-x-2">
+                  <span className="flex items-center"><BarChart3 className="w-5 h-5 mr-2" />Performance Distribution</span>
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><span className="text-xs underline cursor-help text-muted-foreground">What is this?</span></TooltipTrigger><TooltipContent>Share of all performance metrics in four bands: Excellent (90–100), Good (80–89), Average (70–79), Poor (&lt;70).</TooltipContent></Tooltip></TooltipProvider>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -459,9 +495,9 @@ export default function Analytics() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <TrendingUp className="w-5 h-5 mr-2" />
-                  PIP Success Metrics
+                <CardTitle className="flex items-center space-x-2">
+                  <span className="flex items-center"><TrendingUp className="w-5 h-5 mr-2" />PIP Success Metrics</span>
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><span className="text-xs underline cursor-help text-muted-foreground">What is this?</span></TooltipTrigger><TooltipContent>Expected PIP outcomes using your success rate assumption. Adjust rate in Assumptions to see different scenarios.</TooltipContent></Tooltip></TooltipProvider>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -574,7 +610,10 @@ export default function Analytics() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Coaching Effectiveness</CardTitle>
+                <CardTitle className="flex items-center space-x-2">
+                  <span>Coaching Effectiveness</span>
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><span className="text-xs underline cursor-help text-muted-foreground">What is this?</span></TooltipTrigger><TooltipContent>Breakdown of coaching outcomes by session score: ≥80 effective, 60–79 moderate, &lt;60 needs work.</TooltipContent></Tooltip></TooltipProvider>
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-3 gap-4 text-center">
@@ -614,7 +653,10 @@ export default function Analytics() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Coaching Volume</CardTitle>
+                <CardTitle className="flex items-center space-x-2">
+                  <span>Coaching Volume</span>
+                  <TooltipProvider><Tooltip><TooltipTrigger asChild><span className="text-xs underline cursor-help text-muted-foreground">What is this?</span></TooltipTrigger><TooltipContent>Total coaching sessions recorded. Includes automated sessions generated by the system.</TooltipContent></Tooltip></TooltipProvider>
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center">
@@ -646,7 +688,10 @@ export default function Analytics() {
         <TabsContent value="utilization" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Utilization Analysis</CardTitle>
+              <CardTitle className="flex items-center space-x-2">
+                <span>Utilization Analysis</span>
+                <TooltipProvider><Tooltip><TooltipTrigger asChild><span className="text-xs underline cursor-help text-muted-foreground">What is this?</span></TooltipTrigger><TooltipContent>Distribution of utilization across employees: High (≥80%), Medium (60–79%), Low (&lt;60%).</TooltipContent></Tooltip></TooltipProvider>
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-4">

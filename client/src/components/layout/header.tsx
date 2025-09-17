@@ -19,7 +19,23 @@ export default function Header() {
 
   // Count recent notifications (logs from today)
   const today = new Date().toISOString().split('T')[0];
-  const role = typeof window !== 'undefined' ? (window.localStorage.getItem('demoRole') || 'viewer') : 'viewer';
+
+  // Demo role state (used for filtering + header control)
+  const [demoRole, setDemoRole] = useState<string>('hr');
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem('demoRole');
+    if (saved) {
+      setDemoRole(saved);
+    } else {
+      window.localStorage.setItem('demoRole', 'hr');
+      setDemoRole('hr');
+      // broadcast so listeners (e.g., Dashboard) sync immediately
+      window.dispatchEvent(new CustomEvent('demoRoleChanged', { detail: 'hr' }));
+    }
+  }, []);
+
+  // Use stateful demoRole for filtering; seed localStorage if missing
   const managerActions = new Set([
     'pip_created', 'pip_updated', 'pip_created_automatically', 'coaching_generated', 'coaching_session_created', 'csv_uploaded', 'template_generated'
   ]);
@@ -30,8 +46,8 @@ export default function Header() {
 
   const roleFilter = (log: any) => {
     const action = String(log.action || '').toLowerCase();
-    if (role === 'manager') return managerActions.has(action);
-    if (role === 'hr') return hrActions.has(action) || managerActions.has(action);
+    if (demoRole === 'manager') return managerActions.has(action);
+    if (demoRole === 'hr') return hrActions.has(action) || managerActions.has(action);
     return viewerActions.has(action);
   };
 
@@ -39,12 +55,6 @@ export default function Header() {
     const isToday = log.timestamp && log.timestamp.toString().startsWith(today);
     return isToday && roleFilter({ action: (log.action || '').toLowerCase() });
   }) || [];
-
-  const [demoRole, setDemoRole] = useState<string>('hr');
-  useEffect(() => {
-    const saved = typeof window !== 'undefined' ? window.localStorage.getItem('demoRole') : null;
-    if (saved) setDemoRole(saved);
-  }, []);
 
   const onRoleChange = (role: string) => {
     setDemoRole(role);
@@ -120,8 +130,8 @@ export default function Header() {
               {todayLogs.length === 0 ? (
                 <div className="p-2 text-xs text-muted-foreground">No notifications today</div>
               ) : (
-                (todayLogs as any[]).slice(0, 10).map((log: any) => (
-                  <DropdownMenuItem key={log.id} className="flex flex-col items-start space-y-0.5 py-2">
+                (todayLogs as any[]).slice(0, 10).map((log: any, i: number) => (
+                  <DropdownMenuItem key={`${log.id || log.entityId || 'log'}-${i}`} className="flex flex-col items-start space-y-0.5 py-2">
                     <div className="text-sm font-medium">{log.action}</div>
                     <div className="text-xs text-muted-foreground">{log.entityType} • {new Date(log.timestamp).toLocaleTimeString()}</div>
                   </DropdownMenuItem>

@@ -22,6 +22,7 @@ import {
 import { requireRole, requireNotDryRun } from "./auth";
 import { assertTransition } from "./fsm";
 import { weeklyFairnessReport } from "./reports";
+import { computeRoi } from "./roi";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -253,6 +254,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const sessions = await storage.getCoachingSessions(employeeId as string);
+      res.json(sessions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch coaching sessions" });
+    }
+  });
+
+  // All coaching sessions (for analytics)
+  app.get("/api/coaching-sessions/all", async (_req, res) => {
+    try {
+      const sessions = await storage.getAllCoachingSessions();
       res.json(sessions);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch coaching sessions" });
@@ -607,6 +618,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to generate ROI visualization" });
+    }
+  });
+
+  // ROI (server-side) endpoint using computeRoi
+  app.get('/api/roi', async (req, res) => {
+    try {
+      const employees = await storage.getAllEmployees();
+      const pips = await storage.getAllPips();
+      const terminatedEmployees = await storage.getTerminatedEmployees();
+
+      const recovered = pips.filter((p: any) => (p.status === 'completed' || p.status === 'closed')).length;
+      const terminated = terminatedEmployees.length; // or pips.filter(p=>p.status==='terminated').length
+
+      // crude current time-to-decision: use min of baseline and 7 by default; allow override via query
+      const qTtd = parseFloat(String(req.query.currentTtdDays ?? ''));
+      const currentTtdDays = Number.isFinite(qTtd) ? qTtd : 7;
+
+      const avgSalaryEnv = parseFloat(String(process.env.ROI_AVG_SALARY ?? ''));
+      const avgSalary = Number.isFinite(avgSalaryEnv) ? avgSalaryEnv : 75000;
+
+      const out = computeRoi({
+        employees: employees.length,
+        recovered,
+        terminated,
+        currentTtdDays,
+        avgSalary,
+      });
+
+      res.json(out);
+    } catch (e) {
+      res.status(500).json({ error: 'Failed to compute ROI' });
     }
   });
 

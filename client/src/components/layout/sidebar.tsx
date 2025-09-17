@@ -39,7 +39,7 @@ export default function Sidebar() {
             <Bot className="w-4 h-4 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold">PIP AutoFire</h1>
+            <h1 className="text-lg font-semibold">Trilogy AI HR Management System</h1>
             <p className="text-xs text-muted-foreground">AI Talent Management</p>
           </div>
         </div>

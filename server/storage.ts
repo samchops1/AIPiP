@@ -40,6 +40,7 @@ export interface IStorage {
   
   // Coaching Sessions
   getCoachingSessions(employeeId: string): Promise<CoachingSession[]>;
+  getAllCoachingSessions(): Promise<CoachingSession[]>;
   createCoachingSession(session: InsertCoachingSession): Promise<CoachingSession>;
   
   // Audit Logs
@@ -207,6 +208,11 @@ export class MemStorage implements IStorage {
   async getCoachingSessions(employeeId: string): Promise<CoachingSession[]> {
     return Array.from(this.coachingSessions.values())
       .filter(session => session.employeeId === employeeId)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }
+
+  async getAllCoachingSessions(): Promise<CoachingSession[]> {
+    return Array.from(this.coachingSessions.values())
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
